@@ -51,42 +51,45 @@ class MCDropoutWrapper:
         """
         predictions = []
         
+        if not hasattr(self.model, 'predict_with_dropout'):
+            raise AttributeError(
+                f"Model {self.model} does not have predict_with_dropout(). "
+                "MCDropoutWrapper requires a model with explicit dropout support."
+            )
+
         for _ in range(n_samples):
-            # Forward pass with dropout enabled (training=True)
-            if hasattr(self.model, 'predict_with_dropout'):
-                y_pred = self.model.predict_with_dropout(X, training=True)
-            else:
-                # Fallback: use regular predict
-                y_pred, _ = self.model.predict(X, return_std=False)
-            
+            y_pred = self.model.predict_with_dropout(X, training=True)
             predictions.append(y_pred)
-        
+
         predictions = np.array(predictions)
         mean = np.mean(predictions, axis=0)
-        
+
         if return_std:
             std = np.std(predictions, axis=0)
             return mean, std
         return mean, None
-    
+
     def predict_with_ci(self, X: np.ndarray, n_samples: int = 100,
                         ci_level: float = 0.95
                        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Prediction with confidence intervals.
-        
+
         Returns:
             mean: Mean prediction
             lower: Lower CI bound
             upper: Upper CI bound
         """
+        if not hasattr(self.model, 'predict_with_dropout'):
+            raise AttributeError(
+                f"Model {self.model} does not have predict_with_dropout(). "
+                "MCDropoutWrapper requires a model with explicit dropout support."
+            )
+
         predictions = []
-        
+
         for _ in range(n_samples):
-            if hasattr(self.model, 'predict_with_dropout'):
-                y_pred = self.model.predict_with_dropout(X, training=True)
-            else:
-                y_pred, _ = self.model.predict(X, return_std=False)
+            y_pred = self.model.predict_with_dropout(X, training=True)
             predictions.append(y_pred)
         
         predictions = np.array(predictions)
@@ -125,6 +128,8 @@ class MCDropoutDNN(tf.Module):
         self.Xmax = None
         self.Xhmin = None
         self.Xhmax = None
+        self.Y_min = None
+        self.Y_max = None
     
     def _build_layers(self, layer_sizes, dropout_rate):
         """Build layers with dropout after each hidden layer."""
@@ -228,7 +233,8 @@ class MCDropoutDNN(tf.Module):
         y_hf_nl = self._forward(x_aug_n, self.layers_hf_nl, training=training)
         y_hf_l = self._forward(x_aug_n, self.layers_hf_l, training=training)
         
-        return (y_hf_nl + y_hf_l).numpy()
+        y_norm = (y_hf_nl + y_hf_l).numpy()
+        return (y_norm + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
     
     def fit(self, X_lf, Y_lf, X_hf, Y_hf,
             max_epochs=30000, patience=2000, verbose=True):
@@ -241,37 +247,48 @@ class MCDropoutDNN(tf.Module):
         # Compute normalization bounds
         self.Xmin = tf.constant(X_lf.min(axis=0), dtype=tf.float32)
         self.Xmax = tf.constant(X_lf.max(axis=0), dtype=tf.float32)
-        
-        # Get LF predictions at HF for augmented bounds
+
+        # Y normalization bounds from LF data
+        self.Y_min = np.float32(Y_lf.min())
+        self.Y_max = np.float32(Y_lf.max())
+        y_range = float(self.Y_max - self.Y_min) + 1e-8
+
+        # Normalize Y to [-1, 1]
+        Y_lf_n = (2.0 * (Y_lf - self.Y_min) / y_range - 1.0).astype(np.float32)
+        Y_hf_n = (2.0 * (Y_hf - self.Y_min) / y_range - 1.0).astype(np.float32)
+
+        # Augmented HF bounds use normalized Y as the 3rd dim
         from scipy.interpolate import NearestNDInterpolator
-        lf_interp = NearestNDInterpolator(X_lf, Y_lf.flatten())
-        Y_lf_at_hf = lf_interp(X_hf).reshape(-1, 1)
-        X_hf_aug = np.hstack([X_hf, Y_lf_at_hf])
-        
+        lf_interp = NearestNDInterpolator(X_lf, Y_lf_n.flatten())
+        Y_lf_at_hf_n = lf_interp(X_hf).reshape(-1, 1)
+        X_hf_aug = np.hstack([X_hf, Y_lf_at_hf_n])
+
         self.Xhmin = tf.constant(X_hf_aug.min(axis=0), dtype=tf.float32)
         self.Xhmax = tf.constant(X_hf_aug.max(axis=0), dtype=tf.float32)
-        
-        # Convert to tensors
-        x_lf_t = tf.constant(X_lf, dtype=tf.float32)
-        y_lf_t = tf.constant(Y_lf, dtype=tf.float32)
-        x_hf_t = tf.constant(X_hf, dtype=tf.float32)
-        y_hf_t = tf.constant(Y_hf, dtype=tf.float32)
-        
-        # Collect trainable variables from all layers
-        all_layers = self.layers_lf + self.layers_hf_nl + self.layers_hf_l
-        trainable_vars = [v for layer in all_layers
-                          if hasattr(layer, 'trainable_variables')
-                          for v in layer.trainable_variables]
 
+        # Convert to tensors (normalized Y)
+        x_lf_t = tf.constant(X_lf, dtype=tf.float32)
+        y_lf_t = tf.constant(Y_lf_n, dtype=tf.float32)
+        x_hf_t = tf.constant(X_hf, dtype=tf.float32)
+        y_hf_t = tf.constant(Y_hf_n, dtype=tf.float32)
+        
         # Training loop
         best_loss = float('inf')
         wait = 0
         best_weights = None
+        trainable_vars = None  # populated after first step (Dense layers build lazily)
 
         for epoch in range(max_epochs):
             loss, loss_lf, loss_hf = self.train_step(
                 x_lf_t, y_lf_t, x_hf_t, y_hf_t
             )
+
+            # Collect trainable variables after first step — layers are built now
+            if trainable_vars is None:
+                all_layers = self.layers_lf + self.layers_hf_nl + self.layers_hf_l
+                trainable_vars = [v for layer in all_layers
+                                  if hasattr(layer, 'trainable_variables')
+                                  for v in layer.trainable_variables]
 
             loss_val = float(loss)
 
@@ -290,7 +307,7 @@ class MCDropoutDNN(tf.Module):
                 print(f"Epoch {epoch}: loss={loss_val:.6f}")
 
         # Restore best weights
-        if best_weights is not None:
+        if best_weights is not None and trainable_vars is not None:
             for v, val in zip(trainable_vars, best_weights):
                 v.assign(val)
 
@@ -317,7 +334,8 @@ class MCDropoutDNN(tf.Module):
         X = tf.convert_to_tensor(np.asarray(X, dtype=np.float32))
         x_n = self._normalize(X, self.Xmin, self.Xmax)
         y_lf = self._forward(x_n, self.layers_lf, training=False)
-        return y_lf.numpy()
+        y_norm = y_lf.numpy()
+        return (y_norm + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
 
 
 # ============================================================

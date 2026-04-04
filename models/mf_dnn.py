@@ -241,12 +241,14 @@ class MFDNN:
         
         self.trainer = None
         self.is_trained = False
-        
-        # Normalization bounds (computed during training)
+
+        # Normalization bounds (computed during training, all min-max to [-1, 1])
         self.Xmin = None
         self.Xmax = None
         self.Xhmin = None
         self.Xhmax = None
+        self.Y_min = None
+        self.Y_max = None
     
     def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
             X_hf: np.ndarray, Y_hf: np.ndarray) -> Dict[str, Any]:
@@ -267,21 +269,30 @@ class MFDNN:
         Y_lf = np.asarray(Y_lf, dtype=np.float32).reshape(-1, 1)
         X_hf = np.asarray(X_hf, dtype=np.float32)
         Y_hf = np.asarray(Y_hf, dtype=np.float32).reshape(-1, 1)
-        
+
         # =====================================================
         # Compute normalization bounds
         # =====================================================
         self.Xmin = tf.constant(X_lf.min(axis=0), dtype=tf.float32)
         self.Xmax = tf.constant(X_lf.max(axis=0), dtype=tf.float32)
-        
-        # Get LF predictions at HF locations for augmented bounds
-        lf_interp = NearestNDInterpolator(X_lf, Y_lf.flatten())
-        Y_lf_at_hf = lf_interp(X_hf).reshape(-1, 1)
-        X_hf_aug = np.hstack([X_hf, Y_lf_at_hf])
-        
+
+        # Y normalization bounds from LF data (fit on LF; HF uses same scale)
+        self.Y_min = np.float32(Y_lf.min())
+        self.Y_max = np.float32(Y_lf.max())
+        y_range = float(self.Y_max - self.Y_min) + 1e-8
+
+        # Normalize Y to [-1, 1]
+        Y_lf_n = (2.0 * (Y_lf - self.Y_min) / y_range - 1.0).astype(np.float32)
+        Y_hf_n = (2.0 * (Y_hf - self.Y_min) / y_range - 1.0).astype(np.float32)
+
+        # Augmented HF bounds use normalized Y as the 3rd dim
+        lf_interp = NearestNDInterpolator(X_lf, Y_lf_n.flatten())
+        Y_lf_at_hf_n = lf_interp(X_hf).reshape(-1, 1)
+        X_hf_aug = np.hstack([X_hf, Y_lf_at_hf_n])
+
         self.Xhmin = tf.constant(X_hf_aug.min(axis=0), dtype=tf.float32)
         self.Xhmax = tf.constant(X_hf_aug.max(axis=0), dtype=tf.float32)
-        
+
         # =====================================================
         # Create trainer
         # =====================================================
@@ -289,7 +300,7 @@ class MFDNN:
             self.layers_lf, self.layers_hf_nl, self.layers_hf_l,
             learning_rate=self.learning_rate, l2_reg=self.l2_reg
         )
-        
+
         # Learning rate schedule
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=self.learning_rate,
@@ -298,12 +309,12 @@ class MFDNN:
             staircase=True
         )
         self.trainer.optimizer = tf.optimizers.Adam(learning_rate=lr_schedule)
-        
-        # Convert to tensors
+
+        # Convert to tensors (normalized Y)
         x_lf_t = tf.convert_to_tensor(X_lf, dtype=tf.float32)
-        y_lf_t = tf.convert_to_tensor(Y_lf, dtype=tf.float32)
+        y_lf_t = tf.convert_to_tensor(Y_lf_n, dtype=tf.float32)
         x_hf_t = tf.convert_to_tensor(X_hf, dtype=tf.float32)
-        y_hf_t = tf.convert_to_tensor(Y_hf, dtype=tf.float32)
+        y_hf_t = tf.convert_to_tensor(Y_hf_n, dtype=tf.float32)
         
         # =====================================================
         # Training loop with early stopping
@@ -380,9 +391,10 @@ class MFDNN:
         y_hf, y_lf = self.trainer.predict(
             X, self.Xmin, self.Xmax, self.Xhmin, self.Xhmax
         )
-        
-        mean = y_hf.numpy()
-        
+
+        # Denormalize Y
+        mean = (y_hf.numpy() + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
+
         if return_std:
             # Placeholder - use DeepEnsemble for real uncertainty
             std = np.zeros_like(mean)
@@ -399,8 +411,9 @@ class MFDNN:
         _, y_lf = self.trainer.predict(
             X, self.Xmin, self.Xmax, self.Xhmin, self.Xhmax
         )
-        
-        return y_lf.numpy()
+
+        # Denormalize Y
+        return (y_lf.numpy() + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
 
 
 # ============================================================
