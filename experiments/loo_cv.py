@@ -131,8 +131,8 @@ def run_all_loo(use_synthetic: bool = False):
             layers_lf=[2, 20, 20, 1],
             layers_hf_nl=[3, 20, 20, 1],
             layers_hf_l=[3, 1],
-            max_epochs=20000,
-            patience=1000,
+            max_epochs=200,
+            patience=10,
             verbose=False
         ),
         
@@ -140,16 +140,16 @@ def run_all_loo(use_synthetic: bool = False):
             layers_lf=[2, 20, 20, 1],
             layers_hf_nl=[3, 20, 20, 1],
             layers_hf_l=[3, 1],
-            max_epochs=20000,
-            patience=1000,
+            max_epochs=200,
+            patience=10,
             verbose=False
         ),
         
         'Hybrid': lambda: HybridKANDNN(
             kan_layers=[2, 20, 20, 1],
             mlp_layers=[3, 32, 32, 1],
-            max_epochs=20000,
-            patience=1000,
+            max_epochs=200,
+            patience=10,
             verbose=False
         ),
     }
