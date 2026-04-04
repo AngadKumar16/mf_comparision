@@ -345,28 +345,30 @@ class MFKAN:
         self.is_trained = False
         
         # Store normalization stats
-        self.X_mean = None
-        self.X_std = None
-        self.Y_mean = None
-        self.Y_std = None
-    
+        self.X_min = None
+        self.X_max = None
+        self.Y_min = None
+        self.Y_max = None
+
     def _normalize_inputs(self, X: np.ndarray, fit: bool = False) -> np.ndarray:
-        """Normalize inputs to [-1, 1] range."""
+        """Min-max normalize inputs to [-1, 1] to match KAN B-spline grid range."""
         if fit:
-            self.X_mean = X.mean(axis=0)
-            self.X_std = np.maximum(X.std(axis=0), 1e-8)
-        return (X - self.X_mean) / self.X_std
-    
+            self.X_min = X.min(axis=0)
+            self.X_max = X.max(axis=0)
+        return 2.0 * (X - self.X_min) / (self.X_max - self.X_min + 1e-8) - 1.0
+
     def _normalize_outputs(self, Y: np.ndarray, fit: bool = False) -> np.ndarray:
-        """Normalize outputs."""
+        """Min-max normalize outputs to [-1, 1].
+        This keeps the LF output in the KAN B-spline grid range when it is
+        concatenated as the 3rd input dimension of the HF network."""
         if fit:
-            self.Y_mean = Y.mean(axis=0)
-            self.Y_std = np.maximum(Y.std(axis=0), 1e-8)
-        return (Y - self.Y_mean) / self.Y_std
-    
+            self.Y_min = Y.min(axis=0)
+            self.Y_max = Y.max(axis=0)
+        return 2.0 * (Y - self.Y_min) / (self.Y_max - self.Y_min + 1e-8) - 1.0
+
     def _denormalize_outputs(self, Y_norm: np.ndarray) -> np.ndarray:
-        """Denormalize outputs."""
-        return Y_norm * self.Y_std + self.Y_mean
+        """Reverse min-max normalization on outputs."""
+        return (Y_norm + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
     
     def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
             X_hf: np.ndarray, Y_hf: np.ndarray) -> Dict[str, Any]:
@@ -409,27 +411,34 @@ class MFKAN:
         # Training loop
         best_loss = float('inf')
         wait = 0
-        
+        best_weights = None
+
         for epoch in range(self.max_epochs):
             loss, loss_lf, loss_hf = self.trainer.train_step(
                 x_lf_t, y_lf_t, x_hf_t, y_hf_t
             )
-            
+
             loss_val = float(loss)
-            
+
             if loss_val < best_loss:
                 best_loss = loss_val
                 wait = 0
+                best_weights = [v.numpy() for v in self.trainer.trainable_variables]
             else:
                 wait += 1
                 if wait >= self.patience:
                     if self.verbose:
                         print(f"Early stopping at epoch {epoch}")
                     break
-            
+
             if self.verbose and epoch % 5000 == 0:
                 print(f"Epoch {epoch}: loss={loss_val:.6f}")
-        
+
+        # Restore best weights
+        if best_weights is not None:
+            for v, val in zip(self.trainer.trainable_variables, best_weights):
+                v.assign(val)
+
         self.is_trained = True
         
         return {

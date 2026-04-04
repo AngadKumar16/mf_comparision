@@ -306,32 +306,50 @@ class HybridKANDNN(MFModelBase):
         X_hf_t = tf.constant(X_hf_n, dtype=tf.float32)
         Y_hf_t = tf.constant(Y_hf_n, dtype=tf.float32)
         
+        # Collect all trainable variables once (after _build_model)
+        def _get_all_vars():
+            variables = []
+            for layer in self.kan_lf:
+                variables.extend(layer.trainable_variables)
+            for layer in self.mlp_hf:
+                if hasattr(layer, 'trainable_variables'):
+                    variables.extend(layer.trainable_variables)
+            variables.extend([self.rho, self.bias])
+            return variables
+
         # Training loop
         best_loss = float('inf')
         wait = 0
-        
+        best_weights = None
+
         for epoch in range(self.max_epochs):
             loss, loss_lf, loss_hf = self._train_step(
                 X_lf_t, Y_lf_t, X_hf_t, Y_hf_t
             )
-            
+
             loss_val = float(loss)
-            
+
             if loss_val < best_loss:
                 best_loss = loss_val
                 wait = 0
+                best_weights = [v.numpy() for v in _get_all_vars()]
             else:
                 wait += 1
                 if wait >= self.patience:
                     if self.verbose:
                         print(f"Early stopping at epoch {epoch}")
                     break
-            
+
             if self.verbose and epoch % 5000 == 0:
                 print(f"Epoch {epoch}: loss={loss_val:.6f}, "
                       f"LF={float(loss_lf):.6f}, HF={float(loss_hf):.6f}, "
                       f"rho={float(self.rho):.3f}")
-        
+
+        # Restore best weights
+        if best_weights is not None:
+            for v, val in zip(_get_all_vars(), best_weights):
+                v.assign(val)
+
         self.is_trained = True
         
         return {

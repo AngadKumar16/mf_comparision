@@ -16,7 +16,7 @@ RESULTS_DIR.mkdir(exist_ok=True)
 FIGURES_DIR.mkdir(exist_ok=True)
  
 # Your local data path (update this to your actual path)
-MATLAB_DATA_PATH = "/Users/angadkumar16ak/Shukla/Data/Data/Data.mat"
+MATLAB_DATA_PATH = str(PROJECT_ROOT / "data" / "real" / "Data" / "Data.mat")
  
 # ============================================================
 # DATA SPLIT CONFIGURATION

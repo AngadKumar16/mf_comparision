@@ -109,16 +109,16 @@ class MCDropoutDNN(tf.Module):
     
     def __init__(self, layers_lf, layers_hf_nl, layers_hf_l,
                  dropout_rate: float = 0.1, learning_rate: float = 0.001):
-        super().__init__()
-        
+        super().__init__(name="MCDropoutDNN")
+
         self.dropout_rate = dropout_rate
         self.layers_lf = self._build_layers(layers_lf, dropout_rate)
         self.layers_hf_nl = self._build_layers(layers_hf_nl, dropout_rate)
         self.layers_hf_l = self._build_linear_layers(layers_hf_l)
-        
+
         self.optimizer = tf.optimizers.Adam(learning_rate)
         self.is_trained = False
-        self.name = "MC-Dropout-DNN"
+        self.model_name = "MC-Dropout-DNN"
         
         # Normalization stats
         self.Xmin = None
@@ -257,30 +257,43 @@ class MCDropoutDNN(tf.Module):
         x_hf_t = tf.constant(X_hf, dtype=tf.float32)
         y_hf_t = tf.constant(Y_hf, dtype=tf.float32)
         
+        # Collect trainable variables from all layers
+        all_layers = self.layers_lf + self.layers_hf_nl + self.layers_hf_l
+        trainable_vars = [v for layer in all_layers
+                          if hasattr(layer, 'trainable_variables')
+                          for v in layer.trainable_variables]
+
         # Training loop
         best_loss = float('inf')
         wait = 0
-        
+        best_weights = None
+
         for epoch in range(max_epochs):
             loss, loss_lf, loss_hf = self.train_step(
                 x_lf_t, y_lf_t, x_hf_t, y_hf_t
             )
-            
+
             loss_val = float(loss)
-            
+
             if loss_val < best_loss:
                 best_loss = loss_val
                 wait = 0
+                best_weights = [v.numpy() for v in trainable_vars]
             else:
                 wait += 1
                 if wait >= patience:
                     if verbose:
                         print(f"Early stopping at epoch {epoch}")
                     break
-            
+
             if verbose and epoch % 5000 == 0:
                 print(f"Epoch {epoch}: loss={loss_val:.6f}")
-        
+
+        # Restore best weights
+        if best_weights is not None:
+            for v, val in zip(trainable_vars, best_weights):
+                v.assign(val)
+
         self.is_trained = True
         return {'final_loss': best_loss, 'epochs': epoch + 1}
     
