@@ -245,66 +245,116 @@ def save_results_csv(loo_results: dict, noise_results: dict = None):
         print(f"Saved noise ablation to {RESULTS_DIR / 'noise_ablation.csv'}")
 
 
-def main(use_synthetic: bool = False, 
+def train_all_models(data: dict, model_factories: dict) -> dict:
+    """Train one instance of each model on the full HF training set."""
+    trained = {}
+    for name, factory in model_factories.items():
+        print(f"  Training {name}...")
+        m = factory()
+        m.fit(data['X_lf'], data['Y_lf'],
+              data['X_hf_train'], data['Y_hf_train'])
+        trained[name] = m
+    return trained
+
+
+def run_pygmt_maps(data: dict, trained_models: dict,
+                   loo_results: dict = None,
+                   figures_dir=None):
+    """Generate PyGMT maps for all models."""
+    try:
+        from utils.pygmt_maps import generate_all_maps
+    except ImportError as e:
+        print(f"  PyGMT not available ({e}) — skipping maps.")
+        return
+
+    from config import PLOT_CONFIG
+    vmin, vmax = PLOT_CONFIG.get('temp_range', (None, None))
+    out = str(figures_dir / "pygmt") if figures_dir else "figures/pygmt"
+
+    generate_all_maps(
+        models=trained_models,
+        X_lf=data['X_lf'],
+        Y_lf=data['Y_lf'],
+        X_hf=data['X_hf_train'],
+        Y_hf=data['Y_hf_train'],
+        loo_results=loo_results,
+        figures_dir=out,
+        vmin=vmin,
+        vmax=vmax,
+        cmap="rainbow",
+    )
+
+
+def main(use_synthetic: bool = False,
          run_noise: bool = False,
-         save_plots: bool = True):
+         save_plots: bool = True,
+         run_pygmt: bool = True):
     """
     Main experiment entry point.
-    
+
     Args:
         use_synthetic: Use synthetic Forrester data for debugging
         run_noise: Run noise ablation study
-        save_plots: Save plots to files
+        save_plots: Save matplotlib plots to files
+        run_pygmt: Generate PyGMT individual maps
     """
     print("="*60)
     print("MULTI-FIDELITY MODEL COMPARISON")
     print("="*60)
-    
+
     # Set random seed
     np.random.seed(RANDOM_SEED)
-    
+
     # 1. Load data
-    print("\n[1/4] Loading data...")
+    print("\n[1/5] Loading data...")
     data = load_data(use_synthetic=use_synthetic)
-    
+
     # 2. Create model factories
-    print("\n[2/4] Initializing models...")
+    print("\n[2/5] Initializing models...")
     model_factories = create_model_factories()
     print(f"  Models: {list(model_factories.keys())}")
-    
+
     # 3. Run LOO-CV
-    print("\n[3/4] Running LOO-CV...")
+    print("\n[3/5] Running LOO-CV...")
     loo_results = run_loo_comparison(data, model_factories, verbose=True)
-    
+
     # 4. Optional: Noise ablation
     noise_results = None
     if run_noise:
-        print("\n[4/4] Running noise ablation...")
+        print("\n[4/5] Running noise ablation...")
         noise_results = run_noise_ablation(
-            data, model_factories, 
+            data, model_factories,
             noise_levels=[0.0, 0.05, 0.10, 0.15, 0.20],
             n_trials=3
         )
     else:
-        print("\n[4/4] Skipping noise ablation (use --noise to enable)")
-    
-    # 5. Generate plots
-    print("\n[5/5] Generating plots...")
+        print("\n[4/5] Skipping noise ablation (use --noise to enable)")
+
+    # 5. Generate matplotlib plots
+    print("\n[5/5] Generating matplotlib plots...")
     generate_plots(data, loo_results, noise_results, save=save_plots)
-    
-    # 6. Save results
+
+    # 6. PyGMT maps
+    if run_pygmt and save_plots:
+        print("\n[+] Generating PyGMT maps...")
+        print("  Training full models for map generation...")
+        trained_models = train_all_models(data, model_factories)
+        run_pygmt_maps(data, trained_models, loo_results,
+                       figures_dir=FIGURES_DIR)
+
+    # 7. Save results
     save_results_csv(loo_results, noise_results)
-    
+
     # Summary
     print("\n" + "="*60)
     print("SUMMARY")
     print("="*60)
-    
+
     print("\nLOO-CV Results:")
     print("-"*40)
     for name, metrics in loo_results.items():
         print(f"  {name:15s}: RMSE={metrics['rmse']:.4f}, R²={metrics['r2']:.4f}")
-    
+
     if noise_results:
         print("\nNoise Robustness (RMSE at 10% noise):")
         print("-"*40)
@@ -312,10 +362,11 @@ def main(use_synthetic: bool = False,
             if 0.10 in noise_results[name]:
                 rmse = noise_results[name][0.10]['rmse_mean']
                 print(f"  {name:15s}: {rmse:.4f}")
-    
+
     print("\n✓ Experiment complete!")
     print(f"  Results saved to: {RESULTS_DIR}")
     print(f"  Figures saved to: {FIGURES_DIR}")
+    print(f"  PyGMT maps:       {FIGURES_DIR / 'pygmt'}")
 
 
 if __name__ == "__main__":
@@ -328,11 +379,14 @@ if __name__ == "__main__":
                        help='Run noise ablation study')
     parser.add_argument('--no-save', action='store_true',
                        help='Do not save plots')
-    
+    parser.add_argument('--no-pygmt', action='store_true',
+                       help='Skip PyGMT map generation')
+
     args = parser.parse_args()
-    
+
     main(
         use_synthetic=args.synthetic,
         run_noise=args.noise,
-        save_plots=not args.no_save
+        save_plots=not args.no_save,
+        run_pygmt=not args.no_pygmt,
     )
