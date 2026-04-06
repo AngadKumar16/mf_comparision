@@ -600,7 +600,7 @@ if __name__ == "__main__":
         models={"Stub": stub},
         X_lf=X_lf, Y_lf=Y_lf,
         X_hf=X_hf, Y_hf=Y_hf,
-        figures_dir="/tmp/pygmt_test",
+        figures_dir=str(Path(__file__).parent.parent / "figures" / "pygmt"),
         vmin=17, vmax=25,
     )
     print("\nAll done!")

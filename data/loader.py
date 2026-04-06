@@ -133,7 +133,24 @@ def load_matlab_data(mat_path: str,
     
     X_H_full = np.column_stack([x_hf, y_hf])
     Y_H_full = T_hf[:, None]
-    
+
+    # =========================================================
+    # Dataset size assertions
+    # =========================================================
+    n_lf_actual = X_L.shape[0]
+    n_hf_actual = X_H_full.shape[0]
+
+    if n_lf_actual != 653:
+        raise ValueError(
+            f"LF dataset has {n_lf_actual} points — expected 653. "
+            "Check the .mat file or the data extraction logic."
+        )
+    if n_hf_actual != 14:
+        raise ValueError(
+            f"HF dataset has {n_hf_actual} points — expected 14. "
+            "Check the .mat file or the data extraction logic."
+        )
+
     # =========================================================
     # Train/Test Split
     # =========================================================

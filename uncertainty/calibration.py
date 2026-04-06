@@ -83,9 +83,15 @@ def compute_calibration_metrics(y_true: np.ndarray,
     interval_score = np.mean(width + penalty_lower + penalty_upper)
     
     # 6. Coverage at specific levels
-    coverage_50 = observed_coverage[confidence_levels.index(0.5)] if 0.5 in confidence_levels else None
-    coverage_90 = observed_coverage[confidence_levels.index(0.9)] if 0.9 in confidence_levels else None
-    coverage_95 = observed_coverage[confidence_levels.index(0.95)] if 0.95 in confidence_levels else None
+    def _find_coverage(target):
+        for i, c in enumerate(confidence_levels):
+            if abs(c - target) < 1e-9:
+                return observed_coverage[i]
+        return None
+
+    coverage_50 = _find_coverage(0.5)
+    coverage_90 = _find_coverage(0.9)
+    coverage_95 = _find_coverage(0.95)
     
     # 7. Coefficient of Variation of std
     cv_std = np.std(y_std) / np.mean(y_std) if np.mean(y_std) > 0 else 0

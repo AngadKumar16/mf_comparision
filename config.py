@@ -37,26 +37,33 @@ GP_CONFIG = {
 }
  
 # Deep Neural Network
+# HF network is intentionally small: only 12 HF training points total,
+# so 11 per LOO fold. [3, 8, 1] has 32 parameters — much better ratio
+# than the previous [3, 10, 10, 1] (121 parameters).
+# L2 reg increased from 0.01 → 0.1 to compensate for the tiny HF dataset.
 DNN_CONFIG = {
-    'layers_lf': [2, 20, 20, 1],      # Input: 2D coords, Output: 1D
-    'layers_hf_nl': [3, 10, 10, 1],   # Input: 2D + LF pred = 3D
-    'layers_hf_l': [3, 1],            # Linear layer
+    'layers_lf': [2, 20, 20, 1],
+    'layers_hf_nl': [3, 8, 1],
+    'layers_hf_l': [3, 1],
     'learning_rate': 0.001,
     'max_epochs': 30000,
     'patience': 2000,
-    'l2_reg': 0.01,
+    'l2_reg': 0.1,
 }
- 
+
 # Kolmogorov-Arnold Network
+# Same HF architecture reduction as DNN.
+# Patience raised from 1000 → 2000 to match DNN and give the LF
+# B-spline network enough time to converge on the 653-point LF dataset.
 KAN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 10, 10, 1],
+    'layers_hf_nl': [3, 8, 1],
     'layers_hf_l': [3, 1],
     'grid_size': 5,
     'spline_order': 3,
     'learning_rate': 0.001,
     'max_epochs': 30000,
-    'patience': 1000,
+    'patience': 2000,
 }
  
 # Hybrid KAN+DNN (NOVELTY)

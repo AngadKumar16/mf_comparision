@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sklearn.model_selection import LeaveOneOut
 from typing import Callable, Dict, Any
 
-from config import MATLAB_DATA_PATH, N_HF_TRAIN
+from config import MATLAB_DATA_PATH, N_HF_TRAIN, GP_CONFIG, DNN_CONFIG, KAN_CONFIG, HYBRID_CONFIG
 from data.loader import load_matlab_data
 from models.mf_gp import MFGP_Linear
 from models.mf_dnn import MFDNN
@@ -125,31 +125,39 @@ def run_all_loo(use_synthetic: bool = False):
     
     # Model factories
     factories = {
-        'GP-Linear': lambda: MFGP_Linear(num_restarts=5),
-        
+        'GP-Linear': lambda: MFGP_Linear(num_restarts=GP_CONFIG['num_restarts']),
+
         'DNN': lambda: MFDNN(
-            layers_lf=[2, 20, 20, 1],
-            layers_hf_nl=[3, 20, 20, 1],
-            layers_hf_l=[3, 1],
-            max_epochs=200,
-            patience=10,
+            layers_lf=DNN_CONFIG['layers_lf'],
+            layers_hf_nl=DNN_CONFIG['layers_hf_nl'],
+            layers_hf_l=DNN_CONFIG['layers_hf_l'],
+            learning_rate=DNN_CONFIG['learning_rate'],
+            max_epochs=DNN_CONFIG['max_epochs'],
+            patience=DNN_CONFIG['patience'],
+            l2_reg=DNN_CONFIG['l2_reg'],
             verbose=False
         ),
-        
+
         'KAN': lambda: MFKAN(
-            layers_lf=[2, 20, 20, 1],
-            layers_hf_nl=[3, 20, 20, 1],
-            layers_hf_l=[3, 1],
-            max_epochs=200,
-            patience=10,
+            layers_lf=KAN_CONFIG['layers_lf'],
+            layers_hf_nl=KAN_CONFIG['layers_hf_nl'],
+            layers_hf_l=KAN_CONFIG['layers_hf_l'],
+            grid_size=KAN_CONFIG['grid_size'],
+            spline_order=KAN_CONFIG['spline_order'],
+            learning_rate=KAN_CONFIG['learning_rate'],
+            max_epochs=KAN_CONFIG['max_epochs'],
+            patience=KAN_CONFIG['patience'],
             verbose=False
         ),
-        
+
         'Hybrid': lambda: HybridKANDNN(
-            kan_layers=[2, 20, 20, 1],
-            mlp_layers=[3, 32, 32, 1],
-            max_epochs=200,
-            patience=10,
+            kan_layers=HYBRID_CONFIG['kan_layers'],
+            mlp_layers=HYBRID_CONFIG['mlp_layers'],
+            kan_grid_size=HYBRID_CONFIG['kan_grid_size'],
+            kan_spline_order=HYBRID_CONFIG['kan_spline_order'],
+            dropout_rate=HYBRID_CONFIG['dropout_rate'],
+            max_epochs=DNN_CONFIG['max_epochs'],
+            patience=DNN_CONFIG['patience'],
             verbose=False
         ),
     }
