@@ -67,34 +67,51 @@ def compute_uncertainty_metrics(y_true: np.ndarray,
     """
     y_true = np.asarray(y_true).flatten()
     y_pred = np.asarray(y_pred).flatten()
-    y_std = np.maximum(np.asarray(y_std).flatten(), 1e-6)
-    
+    y_std_raw = np.asarray(y_std).flatten()
+
+    # If the model returns no uncertainty (all zeros/NaN), skip NLL/coverage
+    has_uncertainty = np.all(np.isfinite(y_std_raw)) and np.mean(y_std_raw) > 1e-8
+    y_std = np.maximum(y_std_raw, 1e-6)
+
     # Standardized residuals
     z = (y_true - y_pred) / y_std
-    
-    # Negative Log-Likelihood (Gaussian)
-    nll = np.mean(0.5 * np.log(2 * np.pi * y_std**2) + 0.5 * z**2)
+
+    # Negative Log-Likelihood (Gaussian) — only meaningful with real std
+    if has_uncertainty:
+        nll = np.mean(0.5 * np.log(2 * np.pi * y_std**2) + 0.5 * z**2)
+    else:
+        nll = np.nan
     
     # Sharpness (average predicted std)
-    sharpness = np.mean(y_std)
-    
+    sharpness = np.mean(y_std_raw) if has_uncertainty else np.nan
+
+    if not has_uncertainty:
+        return {
+            'nll': np.nan,
+            'sharpness': np.nan,
+            'calibration_error': np.nan,
+            'coverage_90': np.nan,
+            'expected_coverage': [],
+            'observed_coverage': []
+        }
+
     # Calibration: expected vs observed coverage
     from scipy import stats
     expected_coverage = np.array([0.5, 0.7, 0.9, 0.95])
     observed_coverage = []
-    
+
     for q in expected_coverage:
         z_threshold = stats.norm.ppf((1 + q) / 2)
         fraction_in_ci = np.mean(np.abs(z) <= z_threshold)
         observed_coverage.append(fraction_in_ci)
-    
+
     observed_coverage = np.array(observed_coverage)
     calibration_error = np.mean(np.abs(expected_coverage - observed_coverage))
-    
+
     # 90% CI coverage
     z_90 = stats.norm.ppf(0.95)
     coverage_90 = np.mean(np.abs(z) <= z_90)
-    
+
     return {
         'nll': nll,
         'sharpness': sharpness,

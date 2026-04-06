@@ -309,12 +309,13 @@ def main(use_synthetic: bool = False,
     print("\n[1/5] Loading data...")
     data = load_data(use_synthetic=use_synthetic)
 
-    # 2. Create model factories
-    print("\n[2/5] Initializing models...")
+    # 2. Create model factories and train full models once
+    print("\n[2/5] Initializing and training models on full HF set...")
     model_factories = create_model_factories()
     print(f"  Models: {list(model_factories.keys())}")
+    trained_models = train_all_models(data, model_factories)
 
-    # 3. Run LOO-CV
+    # 3. Run LOO-CV (reuses factories, not the trained models)
     print("\n[3/5] Running LOO-CV...")
     loo_results = run_loo_comparison(data, model_factories, verbose=True)
 
@@ -334,11 +335,9 @@ def main(use_synthetic: bool = False,
     print("\n[5/5] Generating matplotlib plots...")
     generate_plots(data, loo_results, noise_results, save=save_plots)
 
-    # 6. PyGMT maps
+    # 6. PyGMT maps (reuse already-trained models — no extra training pass)
     if run_pygmt and save_plots:
         print("\n[+] Generating PyGMT maps...")
-        print("  Training full models for map generation...")
-        trained_models = train_all_models(data, model_factories)
         run_pygmt_maps(data, trained_models, loo_results,
                        figures_dir=FIGURES_DIR)
 
