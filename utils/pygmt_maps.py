@@ -366,7 +366,7 @@ def plot_signed_residuals(y_true: np.ndarray, y_pred: np.ndarray,
     fig.plot(data=np.column_stack([X_hf[:, 0], X_hf[:, 1], resid]),
              style="c0.35c", cmap=cpt, pen="0.5p,black")
     fig.colorbar(cmap=cpt,
-                 frame=["x+lResidual (deg C)", "y+l+overpred / -underpred"])
+                 frame=["x+lResidual (deg C)", "y+l(+)overpred (-) underpred"])
     fig.text(x=np.mean(reg[:2]), y=reg[3],
              text=f"{model_name} — Signed LOO Residuals",
              font="12p,Helvetica-Bold", justify="TC", offset="0/0.3c")
