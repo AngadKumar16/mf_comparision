@@ -412,6 +412,7 @@ class MFKAN:
         best_loss = float('inf')
         wait = 0
         best_weights = None
+        training_history = []
 
         for epoch in range(self.max_epochs):
             loss, loss_lf, loss_hf = self.trainer.train_step(
@@ -419,6 +420,12 @@ class MFKAN:
             )
 
             loss_val = float(loss)
+            training_history.append({
+                'epoch': epoch,
+                'loss': loss_val,
+                'loss_lf': float(loss_lf),
+                'loss_hf': float(loss_hf)
+            })
 
             if loss_val < best_loss:
                 best_loss = loss_val
@@ -440,10 +447,11 @@ class MFKAN:
                 v.assign(val)
 
         self.is_trained = True
-        
+
         return {
             'final_loss': best_loss,
-            'epochs_trained': epoch + 1
+            'epochs_trained': epoch + 1,
+            'history': training_history
         }
     
     def predict(self, X: np.ndarray, return_std: bool = True,

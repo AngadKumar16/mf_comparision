@@ -394,6 +394,300 @@ def plot_multi_surface_comparison(models: Dict[str, Any],
     return fig
 
 
+def plot_residual_analysis(loo_results: Dict[str, Dict[str, Any]],
+                           save_path: str = None):
+    """
+    Three-panel residual diagnostic figure for LOO-CV results.
+
+    Panels:
+      Left  — Histogram of signed residuals with Gaussian overlay (per model)
+      Centre — Side-by-side boxplots of signed residuals
+      Right  — Q-Q plot of standardised residuals (normality check)
+    """
+    from scipy import stats
+
+    model_names = list(loo_results.keys())
+    colors = plt.cm.tab10(np.linspace(0, 1, len(model_names)))
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+
+    # ── Left: histograms ─────────────────────────────────────────────────
+    ax = axes[0]
+    for (name, res), color in zip(loo_results.items(), colors):
+        y_true = np.asarray(res['y_true']).flatten()
+        y_pred = np.asarray(res['y_pred']).flatten()
+        resid = y_pred - y_true
+        ax.hist(resid, bins=8, alpha=0.45, color=color, label=name, density=True)
+        x_fit = np.linspace(resid.min() - 0.5, resid.max() + 0.5, 100)
+        mu, sigma = resid.mean(), resid.std()
+        if sigma > 0:
+            ax.plot(x_fit, stats.norm.pdf(x_fit, mu, sigma), color=color, lw=2)
+    ax.axvline(0, color='black', lw=1.5, ls='--')
+    ax.set_xlabel('Residual (pred − true)')
+    ax.set_ylabel('Density')
+    ax.set_title('Residual Distribution')
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    # ── Centre: boxplots ─────────────────────────────────────────────────
+    ax = axes[1]
+    residuals = []
+    for name, res in loo_results.items():
+        y_true = np.asarray(res['y_true']).flatten()
+        y_pred = np.asarray(res['y_pred']).flatten()
+        residuals.append(y_pred - y_true)
+    bp = ax.boxplot(residuals, labels=model_names, patch_artist=True,
+                    medianprops={'color': 'black', 'lw': 2})
+    for patch, color in zip(bp['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.6)
+    ax.axhline(0, color='black', lw=1.5, ls='--')
+    ax.set_ylabel('Residual (pred − true)')
+    ax.set_title('Residual Boxplots')
+    ax.grid(axis='y', alpha=0.3)
+
+    # ── Right: Q-Q plots ─────────────────────────────────────────────────
+    ax = axes[2]
+    for (name, res), color in zip(loo_results.items(), colors):
+        y_true = np.asarray(res['y_true']).flatten()
+        y_pred = np.asarray(res['y_pred']).flatten()
+        resid = y_pred - y_true
+        sigma = resid.std()
+        z = resid / sigma if sigma > 0 else resid
+        (osm, osr), _ = stats.probplot(z, dist='norm')
+        ax.scatter(osm, osr, color=color, s=50, label=name, zorder=3)
+    ax.plot([-3, 3], [-3, 3], 'k--', lw=1.5)
+    ax.set_xlabel('Theoretical Quantiles')
+    ax.set_ylabel('Sample Quantiles')
+    ax.set_title('Normal Q-Q (standardised residuals)')
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    plt.suptitle('LOO-CV Residual Diagnostics', fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+
+    plt.show()
+    return fig
+
+
+def plot_lf_hf_scatter(X_lf: np.ndarray, Y_lf: np.ndarray,
+                        X_hf: np.ndarray, Y_hf: np.ndarray,
+                        gp_model=None,
+                        save_path: str = None):
+    """
+    Scatter of LF values (interpolated to HF locations) vs HF truth.
+
+    Annotates with the GP-Linear ρ (rho) scaling parameter if the model
+    is provided. Shows the LF-HF linear relationship that motivates
+    multi-fidelity modelling.
+    """
+    from scipy.spatial import cKDTree
+
+    Y_lf_flat = np.asarray(Y_lf).flatten()
+    Y_hf_flat = np.asarray(Y_hf).flatten()
+
+    # Nearest-neighbour interpolation of LF onto HF locations
+    tree = cKDTree(X_lf)
+    _, idx = tree.query(X_hf)
+    Y_lf_at_hf = Y_lf_flat[idx]
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    ax.scatter(Y_lf_at_hf, Y_hf_flat, s=80, color='steelblue',
+               edgecolors='black', linewidth=0.8, zorder=3, label='HF obs')
+
+    # Best-fit line
+    m, b = np.polyfit(Y_lf_at_hf, Y_hf_flat, 1)
+    x_line = np.linspace(Y_lf_at_hf.min(), Y_lf_at_hf.max(), 100)
+    ax.plot(x_line, m * x_line + b, 'r--', lw=2,
+            label=f'Linear fit  (slope={m:.3f})')
+
+    # GP ρ annotation
+    if gp_model is not None and hasattr(gp_model, 'rho'):
+        rho = float(np.asarray(gp_model.rho).flatten()[0])
+        ax.text(0.05, 0.92, f'GP-Linear  ρ = {rho:.3f}',
+                transform=ax.transAxes, fontsize=11,
+                bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+
+    ax.set_xlabel('LF value at HF location (°C)', fontsize=12)
+    ax.set_ylabel('HF observed value (°C)', fontsize=12)
+    ax.set_title('LF–HF Relationship\n(nearest-neighbour LF interpolation)', fontsize=13)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+
+    plt.show()
+    return fig
+
+
+def plot_training_convergence(training_histories: Dict[str, list],
+                               save_path: str = None):
+    """
+    Training loss curves for neural-network models (DNN, KAN).
+
+    Args:
+        training_histories: {model_name: list of {'epoch', 'loss', 'loss_lf', 'loss_hf'}}
+    """
+    if not training_histories:
+        return None
+
+    fig, axes = plt.subplots(1, len(training_histories),
+                              figsize=(6 * len(training_histories), 4),
+                              squeeze=False)
+    axes = axes[0]
+
+    for ax, (name, history) in zip(axes, training_histories.items()):
+        if not history:
+            ax.set_visible(False)
+            continue
+
+        epochs = [h['epoch'] for h in history]
+        loss_total = [h['loss'] for h in history]
+        loss_lf = [h.get('loss_lf', np.nan) for h in history]
+        loss_hf = [h.get('loss_hf', np.nan) for h in history]
+
+        ax.plot(epochs, loss_total, lw=2, label='Total', color='black')
+        if not all(np.isnan(loss_lf)):
+            ax.plot(epochs, loss_lf, lw=1.5, ls='--', label='LF', color='steelblue')
+        if not all(np.isnan(loss_hf)):
+            ax.plot(epochs, loss_hf, lw=1.5, ls='--', label='HF', color='tomato')
+
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Loss (MSE)')
+        ax.set_title(f'{name} Training Convergence')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        ax.set_yscale('log')
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+
+    plt.show()
+    return fig
+
+
+def plot_scenario_comparison(
+        scenario_results: Dict[str, Dict[str, Any]],
+        noise_results: Dict[str, Any] = None,
+        metrics: List[str] = None,
+        save_path: str = None):
+    """
+    Two-row cross-scenario comparison figure.
+
+    Row 1 — Grouped bar chart for each metric (RMSE, MAE, R²).
+             Groups = scenarios; bars within each group = models.
+    Row 2 — Noise-ablation RMSE-vs-noise-level curve (omitted if
+             noise_results is None).
+
+    Args:
+        scenario_results: {scenario_name: {model_name: metrics_dict}}
+        noise_results:    {model_name: {noise_level: metrics_dict}}
+                          metrics_dict must have 'rmse_mean' / 'rmse_std' keys.
+        metrics:          Which metrics to show in the bar chart.
+        save_path:        Optional PNG path.
+    """
+    if metrics is None:
+        metrics = ['rmse', 'mae', 'r2']
+
+    has_noise = noise_results is not None and len(noise_results) > 0
+    n_metric_panels = len(metrics)
+
+    # Layout: 1 or 2 rows
+    if has_noise:
+        fig = plt.figure(figsize=(5 * n_metric_panels, 10))
+        gs = fig.add_gridspec(2, n_metric_panels,
+                              height_ratios=[1, 0.7], hspace=0.45)
+        bar_axes = [fig.add_subplot(gs[0, i]) for i in range(n_metric_panels)]
+        noise_ax = fig.add_subplot(gs[1, :])
+    else:
+        fig, bar_axes = plt.subplots(1, n_metric_panels,
+                                     figsize=(5 * n_metric_panels, 5))
+        if n_metric_panels == 1:
+            bar_axes = [bar_axes]
+
+    scenario_names = list(scenario_results.keys())
+    # Collect model names in consistent order
+    model_names = list(next(iter(scenario_results.values())).keys())
+    n_scenarios = len(scenario_names)
+    n_models = len(model_names)
+
+    model_colors = plt.cm.tab10(np.linspace(0, 1, n_models))
+    bar_width = 0.8 / n_models
+    x = np.arange(n_scenarios)
+
+    metric_meta = {
+        'rmse': ('RMSE', 'lower is better', False),
+        'mae':  ('MAE',  'lower is better', False),
+        'r2':   ('R²',   'higher is better', True),
+        'nll':  ('NLL',  'lower is better', False),
+    }
+
+    # ── Row 1: grouped bar charts ─────────────────────────────────────
+    for ax, metric in zip(bar_axes, metrics):
+        label, direction, _ = metric_meta.get(metric, (metric.upper(), '', False))
+        for m_idx, (mname, color) in enumerate(zip(model_names, model_colors)):
+            vals = [
+                scenario_results[s].get(mname, {}).get(metric, np.nan)
+                for s in scenario_names
+            ]
+            offsets = x + (m_idx - (n_models - 1) / 2) * bar_width
+            bars = ax.bar(offsets, vals, width=bar_width * 0.9,
+                          color=color, label=mname, alpha=0.85)
+
+            # Value labels on bars
+            for bar, v in zip(bars, vals):
+                if np.isfinite(v):
+                    ax.text(bar.get_x() + bar.get_width() / 2,
+                            bar.get_height() + 0.01 * abs(bar.get_height() + 1e-9),
+                            f'{v:.3f}', ha='center', va='bottom', fontsize=7.5)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(scenario_names, rotation=15, ha='right', fontsize=9)
+        ax.set_ylabel(label, fontsize=11)
+        ax.set_title(f'{label}\n({direction})', fontsize=11)
+        ax.grid(axis='y', alpha=0.3)
+        ax.legend(fontsize=8)
+
+    # ── Row 2: noise ablation curve ───────────────────────────────────
+    if has_noise:
+        for mname, color in zip(model_names, model_colors):
+            if mname not in noise_results:
+                continue
+            noise_data = noise_results[mname]
+            levels = sorted(noise_data.keys())
+            means = [noise_data[n].get('rmse_mean', noise_data[n].get('rmse', np.nan))
+                     for n in levels]
+            stds  = [noise_data[n].get('rmse_std', 0) for n in levels]
+            noise_ax.errorbar([l * 100 for l in levels], means, yerr=stds,
+                              marker='o', markersize=7, capsize=4,
+                              label=mname, color=color, lw=2)
+
+        noise_ax.set_xlabel('Noise Level (%)', fontsize=11)
+        noise_ax.set_ylabel('RMSE', fontsize=11)
+        noise_ax.set_title('Noise Ablation — RMSE vs Noise Level (Real data)',
+                           fontsize=11)
+        noise_ax.legend(fontsize=9)
+        noise_ax.grid(True, alpha=0.3)
+
+    fig.suptitle('Cross-Scenario Model Comparison', fontsize=14,
+                 fontweight='bold', y=1.01)
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+
+    plt.show()
+    return fig
+
+
 # ============================================================
 # TESTING
 # ============================================================

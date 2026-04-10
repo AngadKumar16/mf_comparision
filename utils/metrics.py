@@ -218,6 +218,58 @@ def run_loo_cv(model_factory: Callable,
     }
 
 
+def export_latex_table(loo_results: Dict[str, Dict[str, Any]],
+                       save_path: str = None) -> str:
+    """
+    Export LOO-CV results as a LaTeX booktabs table.
+
+    Args:
+        loo_results: {model_name: metrics_dict} from run_loo_cv
+        save_path:   Optional path to write .tex file
+
+    Returns:
+        LaTeX string
+    """
+    import pandas as pd
+
+    rows = {}
+    for name, m in loo_results.items():
+        nll = m.get('nll', float('nan'))
+        cov = m.get('coverage_90', float('nan'))
+        rows[name] = {
+            'RMSE': f"{m['rmse']:.4f}",
+            'MAE':  f"{m['mae']:.4f}",
+            'R²':   f"{m['r2']:.4f}",
+            'NLL':  f"{nll:.4f}" if (nll is not None and not (isinstance(nll, float) and (nll != nll))) else '---',
+            'Cov. 90\\%': f"{cov:.2%}" if (cov is not None and not (isinstance(cov, float) and (cov != cov))) else '---',
+        }
+
+    df = pd.DataFrame(rows).T
+    df.index.name = 'Model'
+
+    latex = df.to_latex(
+        escape=False,
+        column_format='l' + 'r' * len(df.columns),
+        caption='LOO-CV comparison of multi-fidelity surrogate models.',
+        label='tab:loo_results',
+        position='ht',
+    )
+    # Upgrade to booktabs style
+    latex = latex.replace('\\toprule', '\\toprule').replace(
+        '\\begin{tabular}', '\\begin{tabular}')
+    header = (
+        '% Requires \\usepackage{booktabs} in your LaTeX preamble\n'
+    )
+    latex = header + latex
+
+    if save_path:
+        with open(save_path, 'w') as f:
+            f.write(latex)
+        print(f"  LaTeX table saved to {save_path}")
+
+    return latex
+
+
 def print_metrics_summary(metrics: Dict[str, Any], model_name: str = "Model"):
     """Pretty print metrics summary."""
     print(f"\n{'='*50}")

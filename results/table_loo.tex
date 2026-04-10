@@ -1,0 +1,15 @@
+% Requires \usepackage{booktabs} in your LaTeX preamble
+\begin{table}[ht]
+\caption{LOO-CV comparison of multi-fidelity surrogate models.}
+\label{tab:loo_results}
+\begin{tabular}{lrrrrr}
+\toprule
+ & RMSE & MAE & R² & NLL & Cov. 90\% \\
+Model &  &  &  &  &  \\
+\midrule
+GP-Linear & 0.4923 & 0.3869 & 0.3884 & 7.4410 & 66.67% \\
+DNN & 3.2432 & 2.4409 & -25.5440 & --- & --- \\
+KAN & 1.1572 & 0.8433 & -2.3796 & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
