@@ -19,6 +19,7 @@ from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
 from emukit.multi_fidelity.kernels import LinearMultiFidelityKernel
 
 
+# Benchmarking single-fidelity GP for comparison
 class SingleFidelityGP:
     """
     Standard single-fidelity GP for baseline comparison.
