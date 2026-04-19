@@ -26,6 +26,7 @@ from config import (
     NOISE_LEVELS, N_NOISE_TRIALS,
     RESULTS_DIR, FIGURES_DIR
 )
+from utils.data_utils import NormalizingModelWrapper
 
 
 def load_data(use_synthetic: bool = False):
@@ -73,9 +74,10 @@ def create_model_factories():
             learning_rate=DNN_CONFIG['learning_rate'],
             max_epochs=DNN_CONFIG['max_epochs'],
             patience=DNN_CONFIG['patience'],
+            lf_pretrain_patience=DNN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
-        
+
         'KAN': lambda: MFKAN(
             layers_lf=KAN_CONFIG['layers_lf'],
             layers_hf_nl=KAN_CONFIG['layers_hf_nl'],
@@ -85,6 +87,7 @@ def create_model_factories():
             learning_rate=KAN_CONFIG['learning_rate'],
             max_epochs=KAN_CONFIG['max_epochs'],
             patience=KAN_CONFIG['patience'],
+            lf_pretrain_patience=KAN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
     }
@@ -148,11 +151,11 @@ def run_noise_ablation(data: dict, model_factories: dict,
                     seed=RANDOM_SEED + trial * 1000
                 )
                 
-                # Train model
-                model = factory()
+                # Train model (wrapper handles normalization)
+                model = NormalizingModelWrapper(factory())
                 model.fit(data['X_lf'], data['Y_lf'],
                          data['X_hf_train'], Y_hf_noisy)
-                
+
                 # Evaluate on clean test data
                 y_pred, _ = model.predict(data['X_hf_test'], return_std=False)
                 metrics = compute_regression_metrics(data['Y_hf_test'], y_pred)
@@ -297,7 +300,7 @@ def train_all_models(data: dict, model_factories: dict) -> tuple:
 
     for name, factory in model_factories.items():
         print(f"  Training {name}...")
-        m = factory()
+        m = NormalizingModelWrapper(factory())
         info = m.fit(data['X_lf'], data['Y_lf'],
                      data['X_hf_train'], data['Y_hf_train'])
         trained[name] = m
@@ -312,7 +315,8 @@ def train_all_models(data: dict, model_factories: dict) -> tuple:
         if name not in model_factories:
             continue
         factory = model_factories[name]
-        ens = DeepEnsemble(factory, n_models=5)
+        wrapped_factory = lambda f=factory: NormalizingModelWrapper(f())
+        ens = DeepEnsemble(wrapped_factory, n_models=5)
         ens.fit(data['X_lf'], data['Y_lf'],
                 data['X_hf_train'], data['Y_hf_train'],
                 verbose=False)

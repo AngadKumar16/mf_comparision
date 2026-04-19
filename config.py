@@ -49,6 +49,7 @@ DNN_CONFIG = {
     'max_epochs': 30000,
     'patience': 2000,
     'l2_reg': 0.1,
+    'lf_pretrain_patience': 500,   # Phase 1: early-stop LF pretraining on LF loss
 }
 
 # Kolmogorov-Arnold Network
@@ -64,6 +65,7 @@ KAN_CONFIG = {
     'learning_rate': 0.001,
     'max_epochs': 30000,
     'patience': 2000,
+    'lf_pretrain_patience': 500,   # Phase 1: early-stop LF pretraining on LF loss
 }
  
 # Hybrid KAN+DNN (NOVELTY)
@@ -73,6 +75,7 @@ HYBRID_CONFIG = {
     'kan_grid_size': 5,
     'kan_spline_order': 3,
     'dropout_rate': 0.1,
+    'lf_pretrain_patience': 500,   # Phase 1: early-stop LF pretraining on LF loss
 }
  
 # ============================================================

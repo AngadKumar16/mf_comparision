@@ -109,6 +109,7 @@ class HybridKANDNN(MFModelBase):
                  learning_rate: float = 0.001,
                  max_epochs: int = 30000,
                  patience: int = 1000,
+                 lf_pretrain_patience: int = 500,
                  verbose: bool = True):
         """
         Initialize Hybrid KAN+DNN model.
@@ -134,6 +135,7 @@ class HybridKANDNN(MFModelBase):
         self.learning_rate = learning_rate
         self.max_epochs = max_epochs
         self.patience = patience
+        self.lf_pretrain_patience = lf_pretrain_patience
         self.verbose = verbose
         
         # Will be initialized in _build_model
@@ -293,18 +295,15 @@ class HybridKANDNN(MFModelBase):
         X_hf = np.asarray(X_hf, dtype=np.float32)
         Y_hf = np.asarray(Y_hf, dtype=np.float32).reshape(-1, 1)
         
-        # Normalize
-        X_lf_n, Y_lf_n = self._normalize(X_lf, Y_lf, fit=True)
-        X_hf_n, Y_hf_n = self._normalize(X_hf, Y_hf)
-        
+        # Caller pre-normalizes data
         # Build model
         self._build_model()
-        
-        # Convert to tensors
-        X_lf_t = tf.constant(X_lf_n, dtype=tf.float32)
-        Y_lf_t = tf.constant(Y_lf_n, dtype=tf.float32)
-        X_hf_t = tf.constant(X_hf_n, dtype=tf.float32)
-        Y_hf_t = tf.constant(Y_hf_n, dtype=tf.float32)
+
+        # Convert to tensors (data already normalized by caller)
+        X_lf_t = tf.constant(X_lf, dtype=tf.float32)
+        Y_lf_t = tf.constant(Y_lf, dtype=tf.float32)
+        X_hf_t = tf.constant(X_hf, dtype=tf.float32)
+        Y_hf_t = tf.constant(Y_hf, dtype=tf.float32)
         
         # Collect all trainable variables once (after _build_model)
         def _get_all_vars():
@@ -317,7 +316,41 @@ class HybridKANDNN(MFModelBase):
             variables.extend([self.rho, self.bias])
             return variables
 
-        # Training loop
+        def _get_lf_vars():
+            variables = []
+            for layer in self.kan_lf:
+                variables.extend(layer.trainable_variables)
+            return variables
+
+        # ── Phase 1: LF KAN Pretraining ──────────────────────────────────
+        if self.lf_pretrain_patience > 0:
+            lf_vars = _get_lf_vars()
+            best_lf = float('inf')
+            wait_lf = 0
+            best_lf_weights = None
+            for epoch in range(self.max_epochs):
+                with tf.GradientTape() as tape:
+                    y_pred_lf = self._forward_kan(X_lf_t)
+                    reg = sum(layer.regularization_loss(0.001) for layer in self.kan_lf)
+                    loss_lf = tf.reduce_mean(tf.square(y_pred_lf - Y_lf_t)) + reg
+                grads = tape.gradient(loss_lf, lf_vars)
+                self.optimizer.apply_gradients(zip(grads, lf_vars))
+                val = float(loss_lf)
+                if val < best_lf:
+                    best_lf = val
+                    wait_lf = 0
+                    best_lf_weights = [v.numpy() for v in lf_vars]
+                else:
+                    wait_lf += 1
+                    if wait_lf >= self.lf_pretrain_patience:
+                        if self.verbose:
+                            print(f"LF pretrain done at epoch {epoch}, loss_lf={best_lf:.6f}")
+                        break
+            if best_lf_weights is not None:
+                for v, val in zip(lf_vars, best_lf_weights):
+                    v.assign(val)
+
+        # ── Phase 2: Joint Fine-tuning ────────────────────────────────────
         best_loss = float('inf')
         wait = 0
         best_weights = None
@@ -377,39 +410,34 @@ class HybridKANDNN(MFModelBase):
             raise RuntimeError("Model not trained. Call fit() first.")
         
         X = np.asarray(X, dtype=np.float32)
-        X_n = self._normalize(X)
-        X_t = tf.constant(X_n, dtype=tf.float32)
-        
+        X_t = tf.constant(X, dtype=tf.float32)  # caller pre-normalizes
+
         if return_std:
             # MC Dropout: multiple forward passes with dropout enabled
             predictions = []
             for _ in range(n_mc_samples):
                 _, y_hf, _ = self._forward(X_t, training=True)
                 predictions.append(y_hf.numpy())
-            
+
             predictions = np.array(predictions)
             mean_n = np.mean(predictions, axis=0)
             std_n = np.std(predictions, axis=0)
-            
-            mean = self._denormalize_y(mean_n)
-            std = std_n * (self.Y_max - self.Y_min) / 2.0  # Scale std back
-            
-            return mean, std
+
+            return mean_n, std_n  # caller denormalizes
         else:
             _, y_hf, _ = self._forward(X_t, training=False)
-            return self._denormalize_y(y_hf.numpy()), None
-    
+            return y_hf.numpy(), None  # caller denormalizes
+
     def predict_lf(self, X: np.ndarray) -> np.ndarray:
-        """Predict LF output from KAN."""
+        """Predict LF output from KAN (in normalized space — caller denormalizes)."""
         if not self.is_trained:
             raise RuntimeError("Model not trained. Call fit() first.")
-        
+
         X = np.asarray(X, dtype=np.float32)
-        X_n = self._normalize(X)
-        X_t = tf.constant(X_n, dtype=tf.float32)
-        
+        X_t = tf.constant(X, dtype=tf.float32)
+
         y_lf = self._forward_kan(X_t)
-        return self._denormalize_y(y_lf.numpy())
+        return y_lf.numpy()
     
     def get_learned_rho(self) -> float:
         """Get the learned LF-to-HF scaling factor."""

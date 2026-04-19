@@ -292,6 +292,18 @@ class MFKANTrainer(tf.Module):
         
         return loss, loss_lf, loss_hf
     
+    @tf.function
+    def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
+        """Single LF-only training step (Phase 1 pretraining)."""
+        lf_vars = self.kan_lf.trainable_variables
+        with tf.GradientTape() as tape:
+            y_pred_lf = self.kan_lf(x_lf)
+            loss_lf = (tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+                       + self.kan_lf.regularization_loss(0.001))
+        grads = tape.gradient(loss_lf, lf_vars)
+        self.optimizer.apply_gradients(zip(grads, lf_vars))
+        return loss_lf
+
     def predict(self, x_coords: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """
         Predict LF and HF outputs.
@@ -327,6 +339,7 @@ class MFKAN:
                  learning_rate: float = 0.001,
                  max_epochs: int = 30000,
                  patience: int = 1000,
+                 lf_pretrain_patience: int = 500,
                  verbose: bool = True):
         """
         Initialize MF-KAN.
@@ -339,11 +352,12 @@ class MFKAN:
         self.learning_rate = learning_rate
         self.max_epochs = max_epochs
         self.patience = patience
+        self.lf_pretrain_patience = lf_pretrain_patience
         self.verbose = verbose
-        
+
         self.trainer = None
         self.is_trained = False
-        
+
         # Store normalization stats
         self.X_min = None
         self.X_max = None
@@ -381,12 +395,7 @@ class MFKAN:
         X_hf = np.asarray(X_hf, dtype=np.float32)
         Y_hf = np.asarray(Y_hf, dtype=np.float32).reshape(-1, 1)
         
-        # Normalize (fit on LF data)
-        X_lf_n = self._normalize_inputs(X_lf, fit=True)
-        Y_lf_n = self._normalize_outputs(Y_lf, fit=True)
-        X_hf_n = self._normalize_inputs(X_hf)
-        Y_hf_n = self._normalize_outputs(Y_hf)
-        
+        # Caller pre-normalizes data — pass through directly
         # Create trainer
         self.trainer = MFKANTrainer(
             self.layers_lf, self.layers_hf_nl, self.layers_hf_l,
@@ -402,13 +411,35 @@ class MFKAN:
         )
         self.trainer.optimizer = tf.optimizers.Adam(learning_rate=lr_schedule)
         
-        # Convert to tensors
-        x_lf_t = tf.convert_to_tensor(X_lf_n, dtype=tf.float32)
-        y_lf_t = tf.convert_to_tensor(Y_lf_n, dtype=tf.float32)
-        x_hf_t = tf.convert_to_tensor(X_hf_n, dtype=tf.float32)
-        y_hf_t = tf.convert_to_tensor(Y_hf_n, dtype=tf.float32)
+        # Convert to tensors (data already normalized by caller)
+        x_lf_t = tf.convert_to_tensor(X_lf, dtype=tf.float32)
+        y_lf_t = tf.convert_to_tensor(Y_lf, dtype=tf.float32)
+        x_hf_t = tf.convert_to_tensor(X_hf, dtype=tf.float32)
+        y_hf_t = tf.convert_to_tensor(Y_hf, dtype=tf.float32)
         
-        # Training loop
+        # ── Phase 1: LF Pretraining ──────────────────────────────────────
+        if self.lf_pretrain_patience > 0:
+            best_lf = float('inf')
+            wait_lf = 0
+            best_lf_weights = None
+            for epoch in range(self.max_epochs):
+                loss_lf = self.trainer.pretrain_step_lf(x_lf_t, y_lf_t)
+                val = float(loss_lf)
+                if val < best_lf:
+                    best_lf = val
+                    wait_lf = 0
+                    best_lf_weights = [v.numpy() for v in self.trainer.kan_lf.trainable_variables]
+                else:
+                    wait_lf += 1
+                    if wait_lf >= self.lf_pretrain_patience:
+                        if self.verbose:
+                            print(f"LF pretrain done at epoch {epoch}, loss_lf={best_lf:.6f}")
+                        break
+            if best_lf_weights is not None:
+                for v, val in zip(self.trainer.kan_lf.trainable_variables, best_lf_weights):
+                    v.assign(val)
+
+        # ── Phase 2: Joint Fine-tuning ───────────────────────────────────
         best_loss = float('inf')
         wait = 0
         best_weights = None
@@ -463,29 +494,27 @@ class MFKAN:
             raise RuntimeError("Model not trained. Call fit() first.")
         
         X = np.asarray(X, dtype=np.float32)
-        X_n = self._normalize_inputs(X)
-        X_t = tf.convert_to_tensor(X_n, dtype=tf.float32)
-        
+        X_t = tf.convert_to_tensor(X, dtype=tf.float32)
+
         y_hf_n, _ = self.trainer.predict(X_t)
-        y_hf = self._denormalize_outputs(y_hf_n.numpy())
-        
+        y_hf = y_hf_n.numpy()  # caller denormalizes
+
         if return_std:
             # Placeholder - use ensemble for real uncertainty
             std = np.zeros_like(y_hf)
             return y_hf, std
         return y_hf, None
-    
+
     def predict_lf(self, X: np.ndarray) -> np.ndarray:
-        """Predict LF output."""
+        """Predict LF output (in normalized space — caller denormalizes)."""
         if not self.is_trained:
             raise RuntimeError("Model not trained. Call fit() first.")
-        
+
         X = np.asarray(X, dtype=np.float32)
-        X_n = self._normalize_inputs(X)
-        X_t = tf.convert_to_tensor(X_n, dtype=tf.float32)
-        
+        X_t = tf.convert_to_tensor(X, dtype=tf.float32)
+
         _, y_lf_n = self.trainer.predict(X_t)
-        return self._denormalize_outputs(y_lf_n.numpy())
+        return y_lf_n.numpy()
 
 
 # ============================================================

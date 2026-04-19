@@ -195,6 +195,62 @@ def detect_outliers(Y: np.ndarray, threshold: float = 3.0) -> np.ndarray:
     return np.abs(z) > threshold
 
 
+class NormalizingModelWrapper:
+    """
+    Wraps any MF model with min-max normalization to [-1, 1].
+
+    Callers interact with raw-unit data. The wrapper normalizes before
+    fit()/predict() and denormalizes the output, so models never see raw data.
+
+    X stats are fit on combined LF+HF_train.
+    Y stats are fit on LF data only (same bounds applied to HF).
+    """
+
+    def __init__(self, model):
+        self.model = model
+        self._X_min = None
+        self._X_max = None
+        self._Y_min = None
+        self._Y_max = None
+
+    # ── helpers ────────────────────────────────────────────────────────────
+    @property
+    def _yr(self) -> float:
+        return float(self._Y_max - self._Y_min) + 1e-8
+
+    def _nx(self, X: np.ndarray) -> np.ndarray:
+        return 2.0 * (X - self._X_min) / (self._X_max - self._X_min + 1e-8) - 1.0
+
+    def _ny(self, Y: np.ndarray) -> np.ndarray:
+        return 2.0 * (Y - self._Y_min) / self._yr - 1.0
+
+    def _dy(self, Y_n: np.ndarray) -> np.ndarray:
+        return (Y_n + 1.0) * self._yr / 2.0 + self._Y_min
+
+    # ── public API ─────────────────────────────────────────────────────────
+    def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
+            X_hf: np.ndarray, Y_hf: np.ndarray, **kwargs):
+        X_all = np.vstack([np.asarray(X_lf), np.asarray(X_hf)])
+        self._X_min = X_all.min(axis=0)
+        self._X_max = X_all.max(axis=0)
+        self._Y_min = float(np.asarray(Y_lf).min())
+        self._Y_max = float(np.asarray(Y_lf).max())
+        return self.model.fit(
+            self._nx(X_lf), self._ny(Y_lf),
+            self._nx(X_hf), self._ny(Y_hf),
+            **kwargs
+        )
+
+    def predict(self, X: np.ndarray, **kwargs):
+        y_n, std_n = self.model.predict(self._nx(np.asarray(X)), **kwargs)
+        y = self._dy(y_n)
+        std = std_n * self._yr / 2.0 if std_n is not None else None
+        return y, std
+
+    def predict_lf(self, X: np.ndarray) -> np.ndarray:
+        return self._dy(self.model.predict_lf(self._nx(np.asarray(X))))
+
+
 def create_grid(x_range: Tuple[float, float],
                 y_range: Tuple[float, float],
                 n_points: int = 100) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:

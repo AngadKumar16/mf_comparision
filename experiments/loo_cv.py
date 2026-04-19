@@ -63,28 +63,23 @@ def run_loo_cv(model_factory: Callable,
         X_hf_train, Y_hf_train = X_hf[train_idx], Y_hf[train_idx]
         X_hf_val,   Y_hf_val   = X_hf[val_idx],   Y_hf[val_idx]
 
-        # Recompute normalization from this fold's training data only
-        x_mean = np.vstack([X_lf, X_hf_train]).mean(axis=0)
-        x_std  = np.maximum(np.vstack([X_lf, X_hf_train]).std(axis=0), 1e-8)
-        y_hf_mean = Y_hf_train.mean()
-        y_hf_std  = np.maximum(Y_hf_train.std(), 1e-8)
-        y_lf_mean = Y_lf.mean()
-        y_lf_std  = np.maximum(Y_lf.std(), 1e-8)
+        # Per-fold min-max normalization to [-1, 1]
+        # X: fit on combined LF + HF_train; Y: fit on LF only
+        X_all   = np.vstack([X_lf, X_hf_train])
+        X_min   = X_all.min(axis=0);  X_max = X_all.max(axis=0)
+        Y_min   = float(Y_lf.min());  Y_max = float(Y_lf.max())
+        y_range = Y_max - Y_min + 1e-8
 
-        X_lf_n      = (X_lf      - x_mean) / x_std
-        X_hf_train_n = (X_hf_train - x_mean) / x_std
-        X_hf_val_n   = (X_hf_val   - x_mean) / x_std
-        Y_lf_n      = (Y_lf      - y_lf_mean) / y_lf_std
-        Y_hf_train_n = (Y_hf_train - y_hf_mean) / y_hf_std
+        def _nx(X): return 2.0*(X - X_min)/(X_max - X_min + 1e-8) - 1.0
+        def _ny(Y): return 2.0*(Y - Y_min)/y_range - 1.0
+        def _dy(Yn): return (Yn + 1.0) * y_range / 2.0 + Y_min
 
         model = model_factory()
-        model.fit(X_lf_n, Y_lf_n, X_hf_train_n, Y_hf_train_n)
+        model.fit(_nx(X_lf), _ny(Y_lf), _nx(X_hf_train), _ny(Y_hf_train))
 
-        y_pred_n, y_std_n = model.predict(X_hf_val_n, return_std=True)
-
-        # Denormalize back to °C before storing
-        y_pred = y_pred_n * y_hf_std + y_hf_mean
-        y_std  = y_std_n  * y_hf_std
+        y_pred_n, y_std_n = model.predict(_nx(X_hf_val), return_std=True)
+        y_pred = _dy(y_pred_n)
+        y_std  = y_std_n * y_range / 2.0 if y_std_n is not None else np.zeros_like(y_pred)
 
         y_true_list.append(Y_hf_val.flatten()[0])
         y_pred_list.append(y_pred.flatten()[0])
@@ -143,6 +138,7 @@ def run_all_loo(use_synthetic: bool = False):
             max_epochs=DNN_CONFIG['max_epochs'],
             patience=DNN_CONFIG['patience'],
             l2_reg=DNN_CONFIG['l2_reg'],
+            lf_pretrain_patience=DNN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
 
@@ -155,6 +151,7 @@ def run_all_loo(use_synthetic: bool = False):
             learning_rate=KAN_CONFIG['learning_rate'],
             max_epochs=KAN_CONFIG['max_epochs'],
             patience=KAN_CONFIG['patience'],
+            lf_pretrain_patience=KAN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
 
@@ -166,6 +163,7 @@ def run_all_loo(use_synthetic: bool = False):
             dropout_rate=HYBRID_CONFIG['dropout_rate'],
             max_epochs=DNN_CONFIG['max_epochs'],
             patience=DNN_CONFIG['patience'],
+            lf_pretrain_patience=HYBRID_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
     }

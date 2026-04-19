@@ -190,6 +190,19 @@ class MFTrainer(tf.Module):
         
         return y_pred_hf, y_pred_lf
     
+    @tf.function
+    def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
+                         Xmin: tf.Tensor, Xmax: tf.Tensor) -> tf.Tensor:
+        """Single LF-only training step (Phase 1 pretraining)."""
+        lf_vars = self.W_lf + self.b_lf
+        with tf.GradientTape() as tape:
+            tape.watch(lf_vars)
+            y_pred_lf = self.dnn.fnn(self.W_lf, self.b_lf, x_lf, Xmin, Xmax)
+            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+        grads = tape.gradient(loss_lf, lf_vars)
+        self.optimizer.apply_gradients(zip(grads, lf_vars))
+        return loss_lf
+
     def get_weights(self):
         """Return weight lists for saving."""
         return (
@@ -208,7 +221,7 @@ class MFDNN:
     - predict_lf(X) → LF predictions
     """
     
-    def __init__(self, 
+    def __init__(self,
                  layers_lf: List[int] = None,
                  layers_hf_nl: List[int] = None,
                  layers_hf_l: List[int] = None,
@@ -216,6 +229,7 @@ class MFDNN:
                  max_epochs: int = 30000,
                  patience: int = 2000,
                  l2_reg: float = 0.01,
+                 lf_pretrain_patience: int = 500,
                  verbose: bool = True):
         """
         Initialize MF-DNN.
@@ -237,18 +251,17 @@ class MFDNN:
         self.max_epochs = max_epochs
         self.patience = patience
         self.l2_reg = l2_reg
+        self.lf_pretrain_patience = lf_pretrain_patience
         self.verbose = verbose
-        
+
         self.trainer = None
         self.is_trained = False
 
-        # Normalization bounds (computed during training, all min-max to [-1, 1])
+        # X normalization bounds (computed during fit from incoming data)
         self.Xmin = None
         self.Xmax = None
         self.Xhmin = None
         self.Xhmax = None
-        self.Y_min = None
-        self.Y_max = None
     
     def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
             X_hf: np.ndarray, Y_hf: np.ndarray) -> Dict[str, Any]:
@@ -276,19 +289,10 @@ class MFDNN:
         self.Xmin = tf.constant(X_lf.min(axis=0), dtype=tf.float32)
         self.Xmax = tf.constant(X_lf.max(axis=0), dtype=tf.float32)
 
-        # Y normalization bounds from LF data (fit on LF; HF uses same scale)
-        self.Y_min = np.float32(Y_lf.min())
-        self.Y_max = np.float32(Y_lf.max())
-        y_range = float(self.Y_max - self.Y_min) + 1e-8
-
-        # Normalize Y to [-1, 1]
-        Y_lf_n = (2.0 * (Y_lf - self.Y_min) / y_range - 1.0).astype(np.float32)
-        Y_hf_n = (2.0 * (Y_hf - self.Y_min) / y_range - 1.0).astype(np.float32)
-
-        # Augmented HF bounds use normalized Y as the 3rd dim
-        lf_interp = NearestNDInterpolator(X_lf, Y_lf_n.flatten())
-        Y_lf_at_hf_n = lf_interp(X_hf).reshape(-1, 1)
-        X_hf_aug = np.hstack([X_hf, Y_lf_at_hf_n])
+        # Augmented HF bounds: caller pre-normalizes Y, so Y_lf is already in [-1,1]
+        lf_interp = NearestNDInterpolator(X_lf, Y_lf.flatten())
+        Y_lf_at_hf = lf_interp(X_hf).reshape(-1, 1)
+        X_hf_aug = np.hstack([X_hf, Y_lf_at_hf])
 
         self.Xhmin = tf.constant(X_hf_aug.min(axis=0), dtype=tf.float32)
         self.Xhmax = tf.constant(X_hf_aug.max(axis=0), dtype=tf.float32)
@@ -310,14 +314,39 @@ class MFDNN:
         )
         self.trainer.optimizer = tf.optimizers.Adam(learning_rate=lr_schedule)
 
-        # Convert to tensors (normalized Y)
+        # Convert to tensors (Y already normalized by caller)
         x_lf_t = tf.convert_to_tensor(X_lf, dtype=tf.float32)
-        y_lf_t = tf.convert_to_tensor(Y_lf_n, dtype=tf.float32)
+        y_lf_t = tf.convert_to_tensor(Y_lf, dtype=tf.float32)
         x_hf_t = tf.convert_to_tensor(X_hf, dtype=tf.float32)
-        y_hf_t = tf.convert_to_tensor(Y_hf_n, dtype=tf.float32)
+        y_hf_t = tf.convert_to_tensor(Y_hf, dtype=tf.float32)
         
         # =====================================================
-        # Training loop with early stopping
+        # Phase 1: LF Pretraining
+        # =====================================================
+        if self.lf_pretrain_patience > 0:
+            best_lf = float('inf')
+            wait_lf = 0
+            best_lf_weights = None
+            for epoch in range(self.max_epochs):
+                loss_lf = self.trainer.pretrain_step_lf(
+                    x_lf_t, y_lf_t, self.Xmin, self.Xmax)
+                val = float(loss_lf)
+                if val < best_lf:
+                    best_lf = val
+                    wait_lf = 0
+                    best_lf_weights = [w.numpy() for w in self.trainer.W_lf + self.trainer.b_lf]
+                else:
+                    wait_lf += 1
+                    if wait_lf >= self.lf_pretrain_patience:
+                        if self.verbose:
+                            print(f"LF pretrain done at epoch {epoch}, loss_lf={best_lf:.6f}")
+                        break
+            if best_lf_weights is not None:
+                for w, v in zip(self.trainer.W_lf + self.trainer.b_lf, best_lf_weights):
+                    w.assign(v)
+
+        # =====================================================
+        # Phase 2: Joint Fine-tuning (early stopping on combined loss)
         # =====================================================
         best_loss = float('inf')
         wait = 0
@@ -393,27 +422,26 @@ class MFDNN:
         )
 
         # Denormalize Y
-        mean = (y_hf.numpy() + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
+        mean = y_hf.numpy()  # caller denormalizes
 
         if return_std:
             # Placeholder - use DeepEnsemble for real uncertainty
             std = np.zeros_like(mean)
             return mean, std
         return mean, None
-    
+
     def predict_lf(self, X: np.ndarray) -> np.ndarray:
-        """Predict LF output."""
+        """Predict LF output (in normalized space — caller denormalizes)."""
         if not self.is_trained:
             raise RuntimeError("Model not trained. Call fit() first.")
-        
+
         X = tf.convert_to_tensor(np.asarray(X, dtype=np.float32))
-        
+
         _, y_lf = self.trainer.predict(
             X, self.Xmin, self.Xmax, self.Xhmin, self.Xhmax
         )
 
-        # Denormalize Y
-        return (y_lf.numpy() + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
+        return y_lf.numpy()
 
 
 # ============================================================
