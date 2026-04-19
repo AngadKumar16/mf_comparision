@@ -26,6 +26,7 @@ from models.mf_kan import MFKAN
 from models.mf_hybrid import HybridKANDNN
 from utils.metrics import compute_regression_metrics, compute_uncertainty_metrics
 from utils.visualization import plot_loo_scatter
+from utils.data_utils import NormalizingModelWrapper
 
 
 def run_loo_cv(model_factory: Callable,
@@ -63,23 +64,12 @@ def run_loo_cv(model_factory: Callable,
         X_hf_train, Y_hf_train = X_hf[train_idx], Y_hf[train_idx]
         X_hf_val,   Y_hf_val   = X_hf[val_idx],   Y_hf[val_idx]
 
-        # Per-fold min-max normalization to [-1, 1]
-        # X: fit on combined LF + HF_train; Y: fit on LF only
-        X_all   = np.vstack([X_lf, X_hf_train])
-        X_min   = X_all.min(axis=0);  X_max = X_all.max(axis=0)
-        Y_min   = float(Y_lf.min());  Y_max = float(Y_lf.max())
-        y_range = Y_max - Y_min + 1e-8
+        # NormalizingModelWrapper handles per-fold min-max normalization to [-1, 1]
+        model = NormalizingModelWrapper(model_factory())
+        model.fit(X_lf, Y_lf, X_hf_train, Y_hf_train)
 
-        def _nx(X): return 2.0*(X - X_min)/(X_max - X_min + 1e-8) - 1.0
-        def _ny(Y): return 2.0*(Y - Y_min)/y_range - 1.0
-        def _dy(Yn): return (Yn + 1.0) * y_range / 2.0 + Y_min
-
-        model = model_factory()
-        model.fit(_nx(X_lf), _ny(Y_lf), _nx(X_hf_train), _ny(Y_hf_train))
-
-        y_pred_n, y_std_n = model.predict(_nx(X_hf_val), return_std=True)
-        y_pred = _dy(y_pred_n)
-        y_std  = y_std_n * y_range / 2.0 if y_std_n is not None else np.zeros_like(y_pred)
+        y_pred, y_std_raw = model.predict(X_hf_val, return_std=True)
+        y_std = y_std_raw if y_std_raw is not None else np.zeros_like(y_pred)
 
         y_true_list.append(Y_hf_val.flatten()[0])
         y_pred_list.append(y_pred.flatten()[0])

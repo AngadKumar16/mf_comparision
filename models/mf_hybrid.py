@@ -145,12 +145,6 @@ class HybridKANDNN:
         self.bias = None
         self.optimizer = None
         
-        # Normalization stats (min-max to [-1, 1])
-        self.X_min = None
-        self.X_max = None
-        self.Y_min = None
-        self.Y_max = None
-    
     def _build_model(self):
         """Build KAN + MLP architecture."""
         # LF Network: Stack of KAN layers
@@ -264,25 +258,6 @@ class HybridKANDNN:
         self.optimizer.apply_gradients(zip(grads, variables))
         
         return loss, loss_lf, loss_hf
-    
-    def _normalize(self, X: np.ndarray, Y: np.ndarray = None, fit: bool = False):
-        """Normalize inputs and outputs to [-1, 1] (min-max)."""
-        if fit:
-            self.X_min = X.min(axis=0)
-            self.X_max = X.max(axis=0)
-            if Y is not None:
-                self.Y_min = Y.min(axis=0)
-                self.Y_max = Y.max(axis=0)
-
-        X_n = 2.0 * (X - self.X_min) / (self.X_max - self.X_min + 1e-8) - 1.0
-        if Y is not None:
-            Y_n = 2.0 * (Y - self.Y_min) / (self.Y_max - self.Y_min + 1e-8) - 1.0
-            return X_n, Y_n
-        return X_n
-
-    def _denormalize_y(self, Y_n: np.ndarray) -> np.ndarray:
-        """Denormalize outputs from [-1, 1] back to original scale."""
-        return (Y_n + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
     
     def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
             X_hf: np.ndarray, Y_hf: np.ndarray, **kwargs) -> Dict[str, Any]:

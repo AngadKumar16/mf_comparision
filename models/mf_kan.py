@@ -358,32 +358,6 @@ class MFKAN:
         self.trainer = None
         self.is_trained = False
 
-        # Store normalization stats
-        self.X_min = None
-        self.X_max = None
-        self.Y_min = None
-        self.Y_max = None
-
-    def _normalize_inputs(self, X: np.ndarray, fit: bool = False) -> np.ndarray:
-        """Min-max normalize inputs to [-1, 1] to match KAN B-spline grid range."""
-        if fit:
-            self.X_min = X.min(axis=0)
-            self.X_max = X.max(axis=0)
-        return 2.0 * (X - self.X_min) / (self.X_max - self.X_min + 1e-8) - 1.0
-
-    def _normalize_outputs(self, Y: np.ndarray, fit: bool = False) -> np.ndarray:
-        """Min-max normalize outputs to [-1, 1].
-        This keeps the LF output in the KAN B-spline grid range when it is
-        concatenated as the 3rd input dimension of the HF network."""
-        if fit:
-            self.Y_min = Y.min(axis=0)
-            self.Y_max = Y.max(axis=0)
-        return 2.0 * (Y - self.Y_min) / (self.Y_max - self.Y_min + 1e-8) - 1.0
-
-    def _denormalize_outputs(self, Y_norm: np.ndarray) -> np.ndarray:
-        """Reverse min-max normalization on outputs."""
-        return (Y_norm + 1.0) * (self.Y_max - self.Y_min) / 2.0 + self.Y_min
-    
     def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
             X_hf: np.ndarray, Y_hf: np.ndarray) -> Dict[str, Any]:
         """
