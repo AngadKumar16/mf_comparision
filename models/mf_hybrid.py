@@ -20,7 +20,6 @@ import tensorflow as tf
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
 
-from models.base import MFModelBase
 
 
 class KANLayer(tf.Module):
@@ -82,7 +81,7 @@ class KANLayer(tf.Module):
         return l1 * tf.reduce_mean(tf.abs(self.spline_weight))
 
 
-class HybridKANDNN(MFModelBase):
+class HybridKANDNN:
     """
     Hybrid Multi-Fidelity Model: KAN for LF + DNN for HF correction.
     
@@ -125,7 +124,8 @@ class HybridKANDNN(MFModelBase):
             patience: Early stopping patience
             verbose: Print training progress
         """
-        super().__init__(name="Hybrid-KAN-DNN")
+        self.name = "Hybrid-KAN-DNN"
+        self.is_trained = False
         
         self.kan_layers_config = kan_layers or [2, 20, 20, 1]
         self.mlp_layers_config = mlp_layers or [3, 32, 32, 1]

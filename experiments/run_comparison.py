@@ -97,7 +97,8 @@ def create_model_factories():
 
 def run_loo_comparison(data: dict, model_factories: dict, verbose: bool = True):
     """Run LOO-CV for all models and compare."""
-    from utils.metrics import run_loo_cv, print_metrics_summary
+    from experiments.loo_cv import run_loo_cv
+    from utils.metrics import print_metrics_summary
     
     results = {}
     
