@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (
     MATLAB_DATA_PATH, N_HF_TRAIN, RANDOM_SEED,
-    GP_CONFIG, DNN_CONFIG, KAN_CONFIG,
+    GP_CONFIG, DNN_CONFIG, KAN_CONFIG, HYBRID_CONFIG,
     NOISE_LEVELS, N_NOISE_TRIALS,
     RESULTS_DIR, FIGURES_DIR
 )
@@ -63,10 +63,11 @@ def create_model_factories():
     from models.mf_gp import MFGP_Linear
     from models.mf_dnn import MFDNN
     from models.mf_kan import MFKAN
-    
+    from models.mf_hybrid import HybridKANDNN
+
     factories = {
         'GP-Linear': lambda: MFGP_Linear(num_restarts=GP_CONFIG['num_restarts']),
-        
+
         'DNN': lambda: MFDNN(
             layers_lf=DNN_CONFIG['layers_lf'],
             layers_hf_nl=DNN_CONFIG['layers_hf_nl'],
@@ -74,6 +75,7 @@ def create_model_factories():
             learning_rate=DNN_CONFIG['learning_rate'],
             max_epochs=DNN_CONFIG['max_epochs'],
             patience=DNN_CONFIG['patience'],
+            l2_reg=DNN_CONFIG['l2_reg'],
             lf_pretrain_patience=DNN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
@@ -90,38 +92,67 @@ def create_model_factories():
             lf_pretrain_patience=KAN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),
+
+        'Hybrid': lambda: HybridKANDNN(
+            kan_layers=HYBRID_CONFIG['kan_layers'],
+            mlp_layers=HYBRID_CONFIG['mlp_layers'],
+            kan_grid_size=HYBRID_CONFIG['kan_grid_size'],
+            kan_spline_order=HYBRID_CONFIG['kan_spline_order'],
+            dropout_rate=HYBRID_CONFIG['dropout_rate'],
+            max_epochs=HYBRID_CONFIG['max_epochs'],
+            patience=HYBRID_CONFIG['patience'],
+            lf_pretrain_patience=HYBRID_CONFIG.get('lf_pretrain_patience', 500),
+            verbose=False
+        ),
     }
-    
+
     return factories
 
 
-def run_loo_comparison(data: dict, model_factories: dict, verbose: bool = True):
-    """Run LOO-CV for all models and compare."""
+def run_loo_comparison(data: dict, model_factories: dict,
+                       verbose: bool = True, ensemble_nn: bool = True):
+    """Run LOO-CV for all models and compare.
+
+    Args:
+        ensemble_nn: Wrap DNN/KAN with DeepEnsemble(n=3) so they produce
+                     meaningful NLL/Coverage alongside GP-Linear and Hybrid.
+    """
     from experiments.loo_cv import run_loo_cv
     from utils.metrics import print_metrics_summary
-    
+    from uncertainty.ensemble import DeepEnsemble
+
     results = {}
-    
+
     for name, factory in model_factories.items():
         if verbose:
             print(f"\n{'='*50}")
             print(f"Running LOO-CV for {name}")
             print('='*50)
-        
-        metrics = run_loo_cv(
-            model_factory=factory,
-            X_lf=data['X_lf'],
-            Y_lf=data['Y_lf'],
-            X_hf=data['X_hf_train'],
-            Y_hf=data['Y_hf_train'],
-            verbose=verbose
-        )
-        
+
+        effective_factory = factory
+        if ensemble_nn and name in ('DNN', 'KAN'):
+            effective_factory = lambda f=factory: DeepEnsemble(f, n_models=3)
+
+        try:
+            metrics = run_loo_cv(
+                model_factory=effective_factory,
+                X_lf=data['X_lf'],
+                Y_lf=data['Y_lf'],
+                X_hf=data['X_hf_train'],
+                Y_hf=data['Y_hf_train'],
+                verbose=verbose
+            )
+        except Exception as e:
+            print(f"\n  !! {name} LOO-CV failed: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+
         results[name] = metrics
-        
+
         if verbose:
             print_metrics_summary(metrics, name)
-    
+
     return results
 
 
@@ -450,7 +481,7 @@ def main(use_synthetic: bool = False,
 def _loo_scalars(loo_results: dict) -> dict:
     """Strip array columns from LOO results, keep only scalar metrics."""
     scalar_keys = ('rmse', 'mae', 'r2', 'nll', 'coverage_90',
-                   'mse', 'mape', 'sharpness', 'calibration_error')
+                   'mse', 'mape', 'sharpness', 'calibration_error', 'n_folds')
     return {
         model: {k: v for k, v in m.items() if k in scalar_keys}
         for model, m in loo_results.items()
@@ -482,6 +513,17 @@ def export_scenario_latex(scenario_results: dict, save_path: str):
     """Write a LaTeX booktabs table with Scenario+Model as index."""
     import pandas as pd
 
+    # Extract n_folds from the first available result for caption annotation
+    n_folds = None
+    for models in scenario_results.values():
+        for m in models.values():
+            if 'n_folds' in m:
+                n_folds = int(m['n_folds'])
+                break
+        if n_folds is not None:
+            break
+    n_str = f" ($n={n_folds}$ folds per dataset)" if n_folds else ""
+
     rows = []
     for scenario, models in scenario_results.items():
         for model, m in models.items():
@@ -503,7 +545,7 @@ def export_scenario_latex(scenario_results: dict, save_path: str):
         + df.to_latex(
             escape=False,
             column_format='ll' + 'r' * len(df.columns),
-            caption='LOO-CV metrics across all comparison scenarios.',
+            caption=f'LOO-CV metrics across all comparison scenarios{n_str}.',
             label='tab:scenario_comparison',
             position='ht',
             multirow=True,
@@ -512,6 +554,43 @@ def export_scenario_latex(scenario_results: dict, save_path: str):
     with open(save_path, 'w') as f:
         f.write(latex)
     print(f"  Scenario LaTeX → {save_path}")
+
+
+def export_noise_latex(noise_results: dict, save_path: str):
+    """Write RMSE ± std noise ablation table as LaTeX booktabs."""
+    import pandas as pd
+
+    # Collect all noise levels in sorted order
+    noise_levels = sorted({nl for m in noise_results.values() for nl in m.keys()})
+    col_labels = {nl: f"{int(nl*100)}\\%" for nl in noise_levels}
+
+    rows = []
+    for model, noise_data in noise_results.items():
+        row = {'Model': model}
+        for nl in noise_levels:
+            m = noise_data.get(nl, {})
+            mean = m.get('rmse_mean', np.nan)
+            std  = m.get('rmse_std',  np.nan)
+            row[col_labels[nl]] = (
+                f"{mean:.4f} $\\pm$ {std:.4f}"
+                if np.isfinite(mean) else '---'
+            )
+        rows.append(row)
+
+    df = pd.DataFrame(rows).set_index('Model')
+    latex = (
+        '% Requires \\usepackage{booktabs} in your LaTeX preamble\n'
+        + df.to_latex(
+            escape=False,
+            column_format='l' + 'r' * len(df.columns),
+            caption='Noise ablation study: RMSE (mean $\\pm$ std) at each noise level.',
+            label='tab:noise_ablation',
+            position='ht',
+        )
+    )
+    with open(save_path, 'w') as f:
+        f.write(latex)
+    print(f"  Noise LaTeX    → {save_path}")
 
 
 def run_all_scenarios(run_noise: bool = True, save: bool = True):
@@ -566,6 +645,25 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
                           save_path=str(RESULTS_DIR / 'scenario_comparison.csv'))
         export_scenario_latex(scenario_results,
                               save_path=str(RESULTS_DIR / 'table_scenarios.tex'))
+
+        if noise_results is not None:
+            import pandas as pd
+            noise_rows = []
+            for model, noise_data in noise_results.items():
+                for nl, m in noise_data.items():
+                    noise_rows.append({
+                        'Model':      model,
+                        'Noise Level': nl,
+                        'RMSE Mean':  m.get('rmse_mean', np.nan),
+                        'RMSE Std':   m.get('rmse_std',  np.nan),
+                        'MAE Mean':   m.get('mae_mean',  np.nan),
+                        'MAE Std':    m.get('mae_std',   np.nan),
+                    })
+            pd.DataFrame(noise_rows).to_csv(
+                RESULTS_DIR / 'noise_ablation.csv', index=False)
+            print(f"  Noise CSV      → {RESULTS_DIR / 'noise_ablation.csv'}")
+            export_noise_latex(noise_results,
+                               save_path=str(RESULTS_DIR / 'table_noise_ablation.tex'))
 
     # ── Figure ────────────────────────────────────────────────────────
     print("\nGenerating cross-scenario figure...")

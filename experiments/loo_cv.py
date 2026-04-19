@@ -91,6 +91,7 @@ def run_loo_cv(model_factory: Callable,
         'y_true': y_true,
         'y_pred': y_pred,
         'y_std': y_std,
+        'n_folds': n_folds,
         **metrics,
         **unc_metrics,
     }

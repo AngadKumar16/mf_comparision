@@ -1,0 +1,20 @@
+% Requires \usepackage{booktabs,multirow}
+\begin{table}[ht]
+\caption{LOO-CV metrics across all comparison scenarios.}
+\label{tab:scenario_comparison}
+\begin{tabular}{llrrrrr}
+\toprule
+ &  & RMSE & MAE & R² & NLL & Cov.\ 90\% \\
+Scenario & Model &  &  &  &  &  \\
+\midrule
+\multirow[t]{3}{*}{Forrester} & GP-Linear & 4.6007 & 3.6074 & -0.0869 & 4.2817 & 100.00% \\
+ & DNN & 8.0641 & 3.6430 & -2.3394 & --- & --- \\
+ & KAN & 3.8345 & 2.8600 & 0.2449 & --- & --- \\
+\cline{1-7}
+\multirow[t]{3}{*}{Real (clean)} & GP-Linear & 0.4859 & 0.3729 & 0.4043 & 7.3804 & 75.00% \\
+ & DNN & 2.8351 & 1.9619 & -19.2838 & --- & --- \\
+ & KAN & 1.1788 & 1.0036 & -2.5069 & --- & --- \\
+\cline{1-7}
+\bottomrule
+\end{tabular}
+\end{table}

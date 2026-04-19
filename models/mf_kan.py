@@ -15,8 +15,6 @@ Reference: Liu et al., "KAN: Kolmogorov-Arnold Networks" (2024)
 import tensorflow as tf
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
-from scipy.interpolate import NearestNDInterpolator
-
 
 class KANLayer(tf.Module):
     """
