@@ -36,26 +36,26 @@ GP_CONFIG = {
     'num_restarts': 6,
 }
  
+## ============================================================
+# SHARED TRAINING BUDGET
+# ============================================================
+MAX_EPOCHS = 10000          # Safety ceiling; early stopping does the real work
+LF_PRETRAIN_PATIENCE = 500  # Phase 1: stop LF pretraining after no improvement
+JOINT_PATIENCE = 2000       # Phase 2: stop joint training after no improvement
+
 # Deep Neural Network
-# HF network is intentionally small: only 12 HF training points total,
-# so 11 per LOO fold. [3, 8, 1] has 32 parameters — much better ratio
-# than the previous [3, 10, 10, 1] (121 parameters).
-# L2 reg increased from 0.01 → 0.1 to compensate for the tiny HF dataset.
 DNN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
     'layers_hf_nl': [3, 8, 1],
     'layers_hf_l': [3, 1],
     'learning_rate': 0.001,
-    'max_epochs': 30000,
-    'patience': 2000,
+    'max_epochs': MAX_EPOCHS,
+    'patience': JOINT_PATIENCE,
     'l2_reg': 0.1,
-    'lf_pretrain_patience': 500,   # Phase 1: early-stop LF pretraining on LF loss
+    'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
 
 # Kolmogorov-Arnold Network
-# Same HF architecture reduction as DNN.
-# Patience raised from 1000 → 2000 to match DNN and give the LF
-# B-spline network enough time to converge on the 653-point LF dataset.
 KAN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
     'layers_hf_nl': [3, 8, 1],
@@ -63,11 +63,11 @@ KAN_CONFIG = {
     'grid_size': 5,
     'spline_order': 3,
     'learning_rate': 0.001,
-    'max_epochs': 30000,
-    'patience': 2000,
-    'lf_pretrain_patience': 500,   # Phase 1: early-stop LF pretraining on LF loss
+    'max_epochs': MAX_EPOCHS,
+    'patience': JOINT_PATIENCE,
+    'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
- 
+
 # Hybrid KAN+DNN (NOVELTY)
 HYBRID_CONFIG = {
     'kan_layers': [2, 20, 20, 1],
@@ -75,7 +75,9 @@ HYBRID_CONFIG = {
     'kan_grid_size': 5,
     'kan_spline_order': 3,
     'dropout_rate': 0.1,
-    'lf_pretrain_patience': 500,   # Phase 1: early-stop LF pretraining on LF loss
+    'max_epochs': MAX_EPOCHS,
+    'patience': JOINT_PATIENCE,
+    'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
  
 # ============================================================
