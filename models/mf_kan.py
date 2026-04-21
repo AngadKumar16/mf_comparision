@@ -492,27 +492,3 @@ class MFKAN:
         return y_lf_n.numpy()
 
 
-
-# ============================================================
-# TESTING
-# ============================================================
-if __name__ == "__main__":
-    print("Step 1: imports ok")
-    import os
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-    print("Step 2: numpy ok")
-    np.random.seed(42)
-
-    print("Step 3: creating data")
-    X_lf = np.random.rand(100, 2).astype(np.float32)
-    Y_lf = np.zeros((100, 1), dtype=np.float32)
-    X_hf = np.random.rand(12, 2).astype(np.float32)
-    Y_hf = np.zeros((12, 1), dtype=np.float32)
-
-    print("Step 4: creating model")
-    model = MFKAN(max_epochs=3, patience=2, verbose=True)
-
-    print("Step 5: calling fit")
-    info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
-    print("Done")
