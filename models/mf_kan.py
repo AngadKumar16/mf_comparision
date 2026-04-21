@@ -111,24 +111,24 @@ class KANLayer(tf.Module):
         left = tf.sigmoid((x_expanded - grid_expanded[:, :, :-1]) * 100)
         right = tf.sigmoid((grid_expanded[:, :, 1:] - x_expanded) * 100)
         basis = left * right
-        
+        num_grid = self.grid_size + 1 + 2 * self.spline_order
+
         # Recursion for higher orders
         for order in range(1, k + 1):
-            num_grid = self.grid_size + 1 + 2 * self.spline_order
+            # Static size: initial basis has (grid_size + 2*spline_order) elements,
+            # shrinks by 1 each step
+            static_basis_size = self.grid_size + 2 * self.spline_order - order
 
-            
-            # Weights for recursion
             num = x_expanded - grid_expanded[:, :, :num_grid - 1 - order]
             den = grid_expanded[:, :, order:num_grid - 1] - grid_expanded[:, :, :num_grid - 1 - order] + 1e-8
             w1 = num / den
-            
+
             num = grid_expanded[:, :, order + 1:] - x_expanded
             den = grid_expanded[:, :, order + 1:] - grid_expanded[:, :, 1:num_grid - order] + 1e-8
             w2 = num / den
-            
-            # Limit to valid range
-            basis = w1[:, :, :tf.shape(basis)[-1] - 1] * basis[:, :, :-1] + \
-                   w2[:, :, :tf.shape(basis)[-1] - 1] * basis[:, :, 1:]
+
+            basis = w1[:, :, :static_basis_size] * basis[:, :, :-1] + \
+                    w2[:, :, :static_basis_size] * basis[:, :, 1:]
         
         return basis
     
@@ -490,37 +490,6 @@ class MFKAN:
         _, y_lf_n = self.trainer.predict(X_t)
         return y_lf_n.numpy()
 
-
-# ============================================================
-# TESTING
-# ============================================================
-if __name__ == "__main__":
-    print("Testing MF-KAN with synthetic data...")
-    
-    import os
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    
-    np.random.seed(42)
-    
-    # LF data
-    X_lf = np.random.rand(100, 2).astype(np.float32)
-    Y_lf = (np.sin(2 * np.pi * X_lf[:, 0:1]) + 0.1 * np.random.randn(100, 1)).astype(np.float32)
-    
-    # HF data
-    X_hf = np.random.rand(12, 2).astype(np.float32)
-    Y_hf = (np.sin(2 * np.pi * X_hf[:, 0:1]) + 0.5 * X_hf[:, 1:2]).astype(np.float32)
-    
-    print("\nTesting MFKAN...")
-    model = MFKAN(max_epochs=3000, patience=300, verbose=True)
-    info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
-    print(f"\nFinal loss: {info['final_loss']:.6f}")
-    
-    # Test prediction
-    X_test = np.random.rand(5, 2).astype(np.float32)
-    y_pred, _ = model.predict(X_test)
-    print(f"Predictions shape: {y_pred.shape}")
-    
-    print("\n✓ MF-KAN tests passed!")
 
 
 # ============================================================
