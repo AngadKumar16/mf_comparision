@@ -405,8 +405,9 @@ class MFKAN:
                 else:
                     wait_lf += 1
                     if wait_lf >= self.lf_pretrain_patience:
-                        if self.verbose:
-                            print(f"LF pretrain done at epoch {epoch}, loss_lf={best_lf:.6f}")
+                        if self.verbose and epoch % 5000 == 0:
+                            import time
+                            print(f"Epoch {epoch}: loss={loss_val:.6f} | time={time.strftime('%H:%M:%S')}")
                         break
             if best_lf_weights is not None:
                 for v, val in zip(self.trainer.kan_lf.trainable_variables, best_lf_weights):
