@@ -12,6 +12,9 @@ Extracted from your existing code in Document 6.
 Reference: Liu et al., "KAN: Kolmogorov-Arnold Networks" (2024)
 """
 
+import os
+import time
+
 import tensorflow as tf
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
@@ -406,7 +409,6 @@ class MFKAN:
                     wait_lf += 1
                     if wait_lf >= self.lf_pretrain_patience:
                         if self.verbose and epoch % 5000 == 0:
-                            import time
                             print(f"Epoch {epoch}: loss={loss_val:.6f} | time={time.strftime('%H:%M:%S')}")
                         break
             if best_lf_weights is not None:
@@ -445,7 +447,8 @@ class MFKAN:
                     break
 
             if self.verbose and epoch % 5000 == 0:
-                print(f"Epoch {epoch}: loss={loss_val:.6f}")
+                print(f"Epoch {epoch}: loss={loss_val:.6f} | time={time.strftime('%H:%M:%S')}")
+
 
         # Restore best weights
         if best_weights is not None:
@@ -492,3 +495,24 @@ class MFKAN:
         return y_lf_n.numpy()
 
 
+# ============================================================
+# TESTING
+# ============================================================
+if __name__ == "__main__":
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    print("Testing MF-KAN with synthetic data...")
+
+    np.random.seed(42)
+    X_lf = np.random.rand(100, 2).astype(np.float32)
+    Y_lf = (np.sin(2 * np.pi * X_lf[:, 0:1]) + 0.1 * np.random.randn(100, 1)).astype(np.float32)
+    X_hf = np.random.rand(12, 2).astype(np.float32)
+    Y_hf = (np.sin(2 * np.pi * X_hf[:, 0:1]) + 0.5 * X_hf[:, 1:2]).astype(np.float32)
+
+    model = MFKAN(max_epochs=10000, patience=1000, verbose=True)
+    info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
+    print(f"Final loss: {info['final_loss']:.6f}, Epochs: {info['epochs_trained']}")
+
+    X_test = np.random.rand(5, 2).astype(np.float32)
+    y_pred, _ = model.predict(X_test)
+    print(f"Predictions: {y_pred.flatten()}")
+    print("✓ MF-KAN test passed!")
