@@ -131,7 +131,7 @@ def run_loo_comparison(data: dict, model_factories: dict,
 
         effective_factory = factory
         if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
-            effective_factory = lambda f=factory: DeepEnsemble(f, n_models=3)
+            effective_factory = lambda f=factory: DeepEnsemble(f, n_models=5)
 
         try:
             metrics = run_loo_cv(
