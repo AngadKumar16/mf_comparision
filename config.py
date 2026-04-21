@@ -33,7 +33,7 @@ RANDOM_SEED = 42
 GP_CONFIG = {
     'kernel': 'RBF',
     'ARD': True,
-    'num_restarts': 6,
+    'num_restarts': 10,
 }
  
 ## ============================================================
@@ -51,14 +51,14 @@ DNN_CONFIG = {
     'learning_rate': 0.001,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
-    'l2_reg': 0.1,
+    'l2_reg': 0.01,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
 
 # Kolmogorov-Arnold Network
 KAN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 8, 1],
+    'layers_hf_nl': [3, 10, 10, 1],
     'layers_hf_l': [3, 1],
     'grid_size': 5,
     'spline_order': 3,

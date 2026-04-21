@@ -16,6 +16,7 @@ import tensorflow as tf
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
 
+
 class KANLayer(tf.Module):
     """
     Efficient KAN Layer using B-spline basis functions.
@@ -113,7 +114,8 @@ class KANLayer(tf.Module):
         
         # Recursion for higher orders
         for order in range(1, k + 1):
-            num_grid = tf.shape(grid_extended)[1]
+            num_grid = self.grid_size + 1 + 2 * self.spline_order
+
             
             # Weights for recursion
             num = x_expanded - grid_expanded[:, :, :num_grid - 1 - order]
@@ -255,51 +257,51 @@ class MFKANTrainer(tf.Module):
             [self.W_hf_l, self.b_hf_l]
         )
     
+    @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
-                   x_hf_coords: tf.Tensor, y_hf: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        """
-        Single training step.
-        """
+                x_hf_coords: tf.Tensor, y_hf: tf.Tensor,
+                n_lf: int):   # pass as Python int, not tf.shape
+        
+        x_combined = tf.concat([x_lf, x_hf_coords], axis=0)
+
+
         with tf.GradientTape() as tape:
-            # LF prediction at LF locations
-            y_pred_lf = self.kan_lf(x_lf)
-            
-            # LF prediction at HF coordinates
-            y_lf_at_hf = self.kan_lf(x_hf_coords)
-            
+            # Single kan_lf forward pass instead of two
+            y_combined = self.kan_lf(x_combined)
+            y_pred_lf  = y_combined[:n_lf]
+            y_lf_at_hf = y_combined[n_lf:]
+
             # Augment HF coordinates
             x_aug = tf.concat([x_hf_coords, y_lf_at_hf], axis=1)
-            
+
             # HF predictions
             y_pred_hf_nl = self.kan_hf_nl(x_aug)
-            y_pred_hf_l = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
-            y_pred_hf = y_pred_hf_l + y_pred_hf_nl
-            
+            y_pred_hf_l  = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
+            y_pred_hf    = y_pred_hf_l + y_pred_hf_nl
+
             # Losses
             loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
             loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
-            
-            # KAN regularization
-            reg_lf = self.kan_lf.regularization_loss(0.001)
-            reg_hf = self.kan_hf_nl.regularization_loss(0.001)
-            
-            loss = loss_lf + loss_hf + reg_lf + reg_hf
-        
+            reg_lf  = self.kan_lf.regularization_loss(0.001)
+            reg_hf  = self.kan_hf_nl.regularization_loss(0.001)
+            loss    = loss_lf + loss_hf + reg_lf + reg_hf
+
         grads = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
-        
+
         return loss, loss_lf, loss_hf
-    
+
+    @tf.function
     def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
-        """Single LF-only training step (Phase 1 pretraining)."""
         lf_vars = self.kan_lf.trainable_variables
         with tf.GradientTape() as tape:
             y_pred_lf = self.kan_lf(x_lf)
-            loss_lf = (tf.reduce_mean(tf.square(y_pred_lf - y_lf))
-                       + self.kan_lf.regularization_loss(0.001))
+            loss_lf   = (tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+                        + self.kan_lf.regularization_loss(0.001))
         grads = tape.gradient(loss_lf, lf_vars)
         self.lf_optimizer.apply_gradients(zip(grads, lf_vars))
         return loss_lf
+
 
     def predict(self, x_coords: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -418,7 +420,8 @@ class MFKAN:
 
         for epoch in range(self.max_epochs):
             loss, loss_lf, loss_hf = self.trainer.train_step(
-                x_lf_t, y_lf_t, x_hf_t, y_hf_t
+                x_lf_t, y_lf_t, x_hf_t, y_hf_t,
+                n_lf=len(X_lf)   # Python int, static
             )
 
             loss_val = float(loss)
@@ -518,3 +521,28 @@ if __name__ == "__main__":
     print(f"Predictions shape: {y_pred.shape}")
     
     print("\n✓ MF-KAN tests passed!")
+
+
+# ============================================================
+# TESTING
+# ============================================================
+if __name__ == "__main__":
+    print("Step 1: imports ok")
+    import os
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+    print("Step 2: numpy ok")
+    np.random.seed(42)
+
+    print("Step 3: creating data")
+    X_lf = np.random.rand(100, 2).astype(np.float32)
+    Y_lf = np.zeros((100, 1), dtype=np.float32)
+    X_hf = np.random.rand(12, 2).astype(np.float32)
+    Y_hf = np.zeros((12, 1), dtype=np.float32)
+
+    print("Step 4: creating model")
+    model = MFKAN(max_epochs=3, patience=2, verbose=True)
+
+    print("Step 5: calling fit")
+    info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
+    print("Done")
