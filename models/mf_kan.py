@@ -245,7 +245,8 @@ class MFKANTrainer(tf.Module):
         )
         
         self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
-    
+        self.lf_optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
+
     @property
     def trainable_variables(self) -> List[tf.Variable]:
         return (
@@ -254,7 +255,6 @@ class MFKANTrainer(tf.Module):
             [self.W_hf_l, self.b_hf_l]
         )
     
-    @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
                    x_hf_coords: tf.Tensor, y_hf: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         """
@@ -290,7 +290,6 @@ class MFKANTrainer(tf.Module):
         
         return loss, loss_lf, loss_hf
     
-    @tf.function
     def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
         """Single LF-only training step (Phase 1 pretraining)."""
         lf_vars = self.kan_lf.trainable_variables
@@ -299,7 +298,7 @@ class MFKANTrainer(tf.Module):
             loss_lf = (tf.reduce_mean(tf.square(y_pred_lf - y_lf))
                        + self.kan_lf.regularization_loss(0.001))
         grads = tape.gradient(loss_lf, lf_vars)
-        self.optimizer.apply_gradients(zip(grads, lf_vars))
+        self.lf_optimizer.apply_gradients(zip(grads, lf_vars))
         return loss_lf
 
     def predict(self, x_coords: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
@@ -472,8 +471,8 @@ class MFKAN:
         y_hf = y_hf_n.numpy()  # caller denormalizes
 
         if return_std:
-            # Placeholder - use ensemble for real uncertainty
-            std = np.zeros_like(y_hf)
+            # No native uncertainty; use DeepEnsemble wrapper for real std.
+            std = np.full_like(y_hf, np.nan)
             return y_hf, std
         return y_hf, None
 

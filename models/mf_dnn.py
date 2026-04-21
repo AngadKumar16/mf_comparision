@@ -106,8 +106,8 @@ class MFTrainer(tf.Module):
         )
 
         self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
+        self.lf_optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
 
-    @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
                    x_hf_coords: tf.Tensor, y_hf: tf.Tensor
                    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -168,7 +168,6 @@ class MFTrainer(tf.Module):
         y_pred_hf = y_pred_hf_l + y_pred_hf_nl
         return y_pred_hf, y_pred_lf
 
-    @tf.function
     def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
         """Single LF-only training step (Phase 1 pretraining)."""
         lf_vars = self.W_lf + self.b_lf
@@ -177,7 +176,7 @@ class MFTrainer(tf.Module):
             y_pred_lf = self.dnn.fnn(self.W_lf, self.b_lf, x_lf)
             loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
         grads = tape.gradient(loss_lf, lf_vars)
-        self.optimizer.apply_gradients(zip(grads, lf_vars))
+        self.lf_optimizer.apply_gradients(zip(grads, lf_vars))
         return loss_lf
 
     def get_weights(self):
@@ -346,7 +345,8 @@ class MFDNN:
         mean = y_hf.numpy()
 
         if return_std:
-            std = np.zeros_like(mean)
+            # No native uncertainty; use DeepEnsemble wrapper for real std.
+            std = np.full_like(mean, np.nan)
             return mean, std
         return mean, None
 

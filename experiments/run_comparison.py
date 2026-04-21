@@ -130,7 +130,7 @@ def run_loo_comparison(data: dict, model_factories: dict,
             print('='*50)
 
         effective_factory = factory
-        if ensemble_nn and name in ('DNN', 'KAN'):
+        if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
             effective_factory = lambda f=factory: DeepEnsemble(f, n_models=3)
 
         try:

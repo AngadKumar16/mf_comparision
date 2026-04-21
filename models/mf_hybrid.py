@@ -1,320 +1,218 @@
 """
-Hybrid KAN+NN Multi-Fidelity Model
-
-NOVELTY: Combines interpretable KAN for LF modeling with
-flexible DNN for HF correction.
+Hybrid KAN+DNN Multi-Fidelity Model
 
 Architecture:
-    X → KAN_LF → Y_lf (interpretable, smooth B-spline activations)
-    [X, Y_lf] → MLP_HF → delta (nonlinear discrepancy)
-    Y_hf = rho * Y_lf + bias + delta (residual connection)
+    LF:  real KAN (B-spline, from mf_kan.py)  →  X → Y_lf
+    HF nonlinear: real DNN (tanh, from mf_dnn.py) →  [X, Y_lf] → Y_hf_nl
+    HF linear:    simple linear layer            →  [X, Y_lf] → Y_hf_l
+    Final:        Y_hf = Y_hf_nl + Y_hf_l
 
-Why this works:
-    1. KAN provides interpretable LF surrogate (can visualize learned functions)
-    2. MLP handles complex nonlinear discrepancy between LF and HF
-    3. Residual connection preserves LF information flow
-    4. Combines best of both: KAN's smoothness + NN's flexibility
+Combines KAN interpretability for LF surrogate with DNN flexibility for HF correction.
+Normalization handled externally by NormalizingModelWrapper.
 """
 
+import sys
+import os
 import tensorflow as tf
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
 
+# Allow both `python -m models.mf_hybrid` and direct execution
+_PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJ_ROOT not in sys.path:
+    sys.path.insert(0, _PROJ_ROOT)
+
+from models.mf_kan import KAN
+from models.mf_dnn import DNN
 
 
-class KANLayer(tf.Module):
+class MFHybridTrainer(tf.Module):
     """
-    Efficient KAN Layer using B-spline basis functions.
-    Simplified version for the hybrid architecture.
+    Multi-Fidelity Hybrid Trainer: KAN for LF, DNN for HF.
+
+    Architecture:
+    - LF KAN:          X         → Y_lf
+    - HF nonlinear DNN: [X, Y_lf] → Y_hf_nl
+    - HF linear:        [X, Y_lf] → Y_hf_l
+    - Final HF:         Y_hf = Y_hf_nl + Y_hf_l
     """
-    
-    def __init__(self, in_dim: int, out_dim: int, 
-                 grid_size: int = 5, spline_order: int = 3,
-                 name: str = "kan_layer"):
-        super().__init__(name=name)
-        
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.grid_size = grid_size
-        self.spline_order = spline_order
-        
-        # Base weight (residual/linear path)
-        self.base_weight = tf.Variable(
-            tf.random.normal([in_dim, out_dim], stddev=0.1),
-            name='base_weight', dtype=tf.float32
+
+    def __init__(self, layers_lf: List[int], layers_hf_nl: List[int],
+                 layers_hf_l: List[int], grid_size: int = 5,
+                 spline_order: int = 3, learning_rate: float = 0.001,
+                 l2_reg: float = 0.01):
+        super().__init__()
+
+        # LF: real KAN with B-spline activations
+        self.kan_lf = KAN(layers_lf, grid_size, spline_order, name='kan_lf')
+
+        # HF nonlinear: real DNN with tanh activations
+        self.dnn = DNN()
+        self.W_hf_nl, self.b_hf_nl = self.dnn.hyper_initial(layers_hf_nl)
+
+        # HF linear: simple linear projection
+        self.W_hf_l = tf.Variable(
+            tf.random.normal([layers_hf_l[0], layers_hf_l[-1]], stddev=0.1),
+            name='W_hf_l', dtype=tf.float32
         )
-        self.base_bias = tf.Variable(
-            tf.zeros([out_dim]), name='base_bias', dtype=tf.float32
+        self.b_hf_l = tf.Variable(
+            tf.zeros([layers_hf_l[-1]]),
+            name='b_hf_l', dtype=tf.float32
         )
-        
-        # Spline coefficients
-        num_basis = grid_size + spline_order
-        self.spline_weight = tf.Variable(
-            tf.random.normal([in_dim, out_dim, num_basis], stddev=0.05),
-            name='spline_weight', dtype=tf.float32
-        )
-    
-    def __call__(self, x: tf.Tensor) -> tf.Tensor:
-        """Forward pass with SiLU activation on base path."""
-        # Base path with SiLU
-        base_act = x * tf.sigmoid(x)
-        base_out = tf.matmul(base_act, self.base_weight) + self.base_bias
-        
-        # Simplified spline contribution (learned nonlinearity)
-        # Using polynomial features as approximation
-        x_sq = x ** 2
-        x_cb = x ** 3
-        poly_features = tf.concat([x, x_sq, x_cb], axis=-1)
-        
-        # Project to output dimension
-        spline_out = tf.matmul(poly_features, 
-                               tf.reshape(self.spline_weight[:, :, :3], 
-                                         [self.in_dim * 3, self.out_dim]))
-        
-        return base_out + 0.1 * spline_out
-    
+
+        self.l2_reg = l2_reg
+        self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
+        self.lf_optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
+
     @property
     def trainable_variables(self) -> List[tf.Variable]:
-        return [self.base_weight, self.base_bias, self.spline_weight]
-    
-    def regularization_loss(self, l1: float = 0.001) -> tf.Tensor:
-        return l1 * tf.reduce_mean(tf.abs(self.spline_weight))
+        return (
+            self.kan_lf.trainable_variables
+            + self.W_hf_nl + self.b_hf_nl
+            + [self.W_hf_l, self.b_hf_l]
+        )
+
+    def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
+                   x_hf_coords: tf.Tensor, y_hf: tf.Tensor
+                   ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """Single training step. All inputs pre-normalized to [-1, 1]."""
+        with tf.GradientTape() as tape:
+            # LF prediction at LF locations
+            y_pred_lf = self.kan_lf(x_lf)
+
+            # LF prediction at HF coordinates (for augmentation)
+            y_lf_at_hf = self.kan_lf(x_hf_coords)
+
+            # Augment HF coordinates with LF predictions
+            x_aug = tf.concat([x_hf_coords, y_lf_at_hf], axis=1)
+
+            # HF predictions: DNN nonlinear + linear
+            y_pred_hf_nl = self.dnn.fnn(self.W_hf_nl, self.b_hf_nl, x_aug)
+            y_pred_hf_l = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
+            y_pred_hf = y_pred_hf_nl + y_pred_hf_l
+
+            # Losses
+            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+            loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
+            reg_kan = self.kan_lf.regularization_loss(0.001)
+            reg_dnn = self.l2_reg * tf.add_n([tf.nn.l2_loss(w) for w in self.W_hf_nl])
+            loss = loss_lf + loss_hf + reg_kan + reg_dnn
+
+        grads = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+        return loss, loss_lf, loss_hf
+
+    def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
+        """Single LF-only training step (Phase 1 pretraining)."""
+        lf_vars = self.kan_lf.trainable_variables
+        with tf.GradientTape() as tape:
+            y_pred_lf = self.kan_lf(x_lf)
+            loss_lf = (tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+                       + self.kan_lf.regularization_loss(0.001))
+        grads = tape.gradient(loss_lf, lf_vars)
+        self.lf_optimizer.apply_gradients(zip(grads, lf_vars))
+        return loss_lf
+
+    def predict(self, x_coords: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+        """Predict LF and HF. Inputs pre-normalized; outputs in normalized space."""
+        y_pred_lf = self.kan_lf(x_coords)
+        x_aug = tf.concat([x_coords, y_pred_lf], axis=1)
+        y_pred_hf_nl = self.dnn.fnn(self.W_hf_nl, self.b_hf_nl, x_aug)
+        y_pred_hf_l = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
+        y_pred_hf = y_pred_hf_nl + y_pred_hf_l
+        return y_pred_hf, y_pred_lf
 
 
 class HybridKANDNN:
     """
     Hybrid Multi-Fidelity Model: KAN for LF + DNN for HF correction.
-    
-    This is the NOVEL contribution for your paper.
-    
-    Architecture:
-        1. KAN network learns smooth LF mapping: X → Y_lf
-        2. MLP learns nonlinear discrepancy: [X, Y_lf] → delta
-        3. Linear scaling: Y_hf = rho * Y_lf + bias + delta
-    
-    Advantages:
-        - KAN's interpretability for the LF model
-        - DNN's flexibility for the HF correction
-        - Residual connection stabilizes training
-        - MC Dropout provides uncertainty quantification
+
+    Clean interface matching GP/DNN/KAN API.
+    Expects pre-normalized data (handled by NormalizingModelWrapper).
+
+    - fit(X_lf, Y_lf, X_hf, Y_hf) → training
+    - predict(X, return_std=True) → HF predictions
+    - predict_lf(X) → LF predictions
     """
-    
+
     def __init__(self,
-                 kan_layers: List[int] = None,
-                 mlp_layers: List[int] = None,
-                 kan_grid_size: int = 5,
-                 kan_spline_order: int = 3,
-                 dropout_rate: float = 0.1,
+                 layers_lf: List[int] = None,
+                 layers_hf_nl: List[int] = None,
+                 layers_hf_l: List[int] = None,
+                 grid_size: int = 5,
+                 spline_order: int = 3,
                  learning_rate: float = 0.001,
                  max_epochs: int = 30000,
                  patience: int = 1000,
+                 l2_reg: float = 0.01,
                  lf_pretrain_patience: int = 500,
                  verbose: bool = True):
-        """
-        Initialize Hybrid KAN+DNN model.
-        
-        Args:
-            kan_layers: KAN architecture for LF, e.g., [2, 20, 20, 1]
-            mlp_layers: MLP architecture for HF, e.g., [3, 32, 32, 1]
-            kan_grid_size: B-spline grid intervals
-            kan_spline_order: B-spline polynomial degree
-            dropout_rate: Dropout for MC uncertainty
-            learning_rate: Initial learning rate
-            max_epochs: Maximum training epochs
-            patience: Early stopping patience
-            verbose: Print training progress
-        """
         self.name = "Hybrid-KAN-DNN"
-        self.is_trained = False
-        
-        self.kan_layers_config = kan_layers or [2, 20, 20, 1]
-        self.mlp_layers_config = mlp_layers or [3, 32, 32, 1]
-        self.kan_grid_size = kan_grid_size
-        self.kan_spline_order = kan_spline_order
-        self.dropout_rate = dropout_rate
+        self.layers_lf = layers_lf or [2, 20, 20, 1]
+        self.layers_hf_nl = layers_hf_nl or [3, 10, 10, 1]
+        self.layers_hf_l = layers_hf_l or [3, 1]
+        self.grid_size = grid_size
+        self.spline_order = spline_order
         self.learning_rate = learning_rate
         self.max_epochs = max_epochs
         self.patience = patience
+        self.l2_reg = l2_reg
         self.lf_pretrain_patience = lf_pretrain_patience
         self.verbose = verbose
-        
-        # Will be initialized in _build_model
-        self.kan_lf = None
-        self.mlp_hf = None
-        self.rho = None
-        self.bias = None
-        self.optimizer = None
-        
-    def _build_model(self):
-        """Build KAN + MLP architecture."""
-        # LF Network: Stack of KAN layers
-        self.kan_lf = []
-        for i in range(len(self.kan_layers_config) - 1):
-            self.kan_lf.append(
-                KANLayer(
-                    self.kan_layers_config[i],
-                    self.kan_layers_config[i + 1],
-                    grid_size=self.kan_grid_size,
-                    spline_order=self.kan_spline_order,
-                    name=f'kan_lf_{i}'
-                )
-            )
-        
-        # HF Network: MLP with dropout
-        self.mlp_hf = []
-        for i in range(len(self.mlp_layers_config) - 1):
-            is_output = (i == len(self.mlp_layers_config) - 2)
-            self.mlp_hf.append(
-                tf.keras.layers.Dense(
-                    self.mlp_layers_config[i + 1],
-                    activation=None if is_output else 'tanh',
-                    kernel_regularizer=tf.keras.regularizers.l2(0.001)
-                )
-            )
-            if not is_output:
-                self.mlp_hf.append(tf.keras.layers.Dropout(self.dropout_rate))
-        
-        # Learnable linear scaling
-        self.rho = tf.Variable(1.0, name='rho', dtype=tf.float32)
-        self.bias = tf.Variable(0.0, name='bias', dtype=tf.float32)
-        
-        # Optimizer with schedule
-        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=self.learning_rate,
-            decay_steps=1000,
-            decay_rate=0.95
-        )
-        self.optimizer = tf.optimizers.Adam(learning_rate=lr_schedule)
-    
-    def _forward_kan(self, x: tf.Tensor) -> tf.Tensor:
-        """Forward pass through KAN LF network."""
-        for layer in self.kan_lf:
-            x = layer(x)
-        return x
-    
-    def _forward_mlp(self, x: tf.Tensor, training: bool = False) -> tf.Tensor:
-        """Forward pass through MLP HF network."""
-        for layer in self.mlp_hf:
-            if isinstance(layer, tf.keras.layers.Dropout):
-                x = layer(x, training=training)
-            else:
-                x = layer(x)
-        return x
-    
-    def _forward(self, X: tf.Tensor, training: bool = False
-                ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        """
-        Full forward pass.
-        
-        Returns:
-            y_lf: LF prediction from KAN
-            y_hf: HF prediction (combined)
-            delta: Nonlinear correction from MLP
-        """
-        # LF prediction via KAN
-        y_lf = self._forward_kan(X)
-        
-        # Augment with LF prediction
-        x_aug = tf.concat([X, y_lf], axis=1)
-        
-        # Nonlinear correction via MLP
-        delta = self._forward_mlp(x_aug, training=training)
-        
-        # HF = linear(LF) + nonlinear(correction)
-        y_hf = self.rho * y_lf + self.bias + delta
-        
-        return y_lf, y_hf, delta
-    
-    @tf.function
-    def _train_step(self, X_lf: tf.Tensor, Y_lf: tf.Tensor,
-                    X_hf: tf.Tensor, Y_hf: tf.Tensor
-                   ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        """Single training step."""
-        with tf.GradientTape() as tape:
-            # Forward pass
-            y_lf_pred_at_lf = self._forward_kan(X_lf)
-            y_lf_pred_at_hf, y_hf_pred, delta = self._forward(X_hf, training=True)
-            
-            # Losses
-            loss_lf = tf.reduce_mean(tf.square(y_lf_pred_at_lf - Y_lf))
-            loss_hf = tf.reduce_mean(tf.square(y_hf_pred - Y_hf))
-            
-            # Regularization
-            reg_kan = sum(layer.regularization_loss(0.001) for layer in self.kan_lf)
-            reg_delta = 0.01 * tf.reduce_mean(tf.square(delta))  # Encourage small corrections
-            
-            loss = loss_lf + loss_hf + reg_kan + reg_delta
-        
-        # Gather trainable variables
-        variables = []
-        for layer in self.kan_lf:
-            variables.extend(layer.trainable_variables)
-        for layer in self.mlp_hf:
-            if hasattr(layer, 'trainable_variables'):
-                variables.extend(layer.trainable_variables)
-        variables.extend([self.rho, self.bias])
-        
-        grads = tape.gradient(loss, variables)
-        self.optimizer.apply_gradients(zip(grads, variables))
-        
-        return loss, loss_lf, loss_hf
-    
+
+        self.trainer = None
+        self.is_trained = False
+
     def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
             X_hf: np.ndarray, Y_hf: np.ndarray, **kwargs) -> Dict[str, Any]:
         """
-        Train the hybrid model.
+        Train the hybrid model on pre-normalized data.
+
+        Args:
+            X_lf: LF inputs (N_L, D) — pre-normalized to [-1, 1]
+            Y_lf: LF outputs (N_L, 1) — pre-normalized to [-1, 1]
+            X_hf: HF inputs (N_H, D) — pre-normalized to [-1, 1]
+            Y_hf: HF outputs (N_H, 1) — pre-normalized to [-1, 1]
+
+        Returns:
+            Training info dict
         """
-        # Convert and reshape
         X_lf = np.asarray(X_lf, dtype=np.float32)
         Y_lf = np.asarray(Y_lf, dtype=np.float32).reshape(-1, 1)
         X_hf = np.asarray(X_hf, dtype=np.float32)
         Y_hf = np.asarray(Y_hf, dtype=np.float32).reshape(-1, 1)
-        
-        # Caller pre-normalizes data
-        # Build model
-        self._build_model()
 
-        # Convert to tensors (data already normalized by caller)
-        X_lf_t = tf.constant(X_lf, dtype=tf.float32)
-        Y_lf_t = tf.constant(Y_lf, dtype=tf.float32)
-        X_hf_t = tf.constant(X_hf, dtype=tf.float32)
-        Y_hf_t = tf.constant(Y_hf, dtype=tf.float32)
-        
-        # Collect all trainable variables once (after _build_model)
-        def _get_all_vars():
-            variables = []
-            for layer in self.kan_lf:
-                variables.extend(layer.trainable_variables)
-            for layer in self.mlp_hf:
-                if hasattr(layer, 'trainable_variables'):
-                    variables.extend(layer.trainable_variables)
-            variables.extend([self.rho, self.bias])
-            return variables
+        self.trainer = MFHybridTrainer(
+            self.layers_lf, self.layers_hf_nl, self.layers_hf_l,
+            grid_size=self.grid_size, spline_order=self.spline_order,
+            learning_rate=self.learning_rate, l2_reg=self.l2_reg
+        )
 
-        def _get_lf_vars():
-            variables = []
-            for layer in self.kan_lf:
-                variables.extend(layer.trainable_variables)
-            return variables
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=self.learning_rate,
+            decay_steps=1000,
+            decay_rate=0.95,
+            staircase=True
+        )
+        self.trainer.optimizer = tf.optimizers.Adam(learning_rate=lr_schedule)
+
+        x_lf_t = tf.convert_to_tensor(X_lf, dtype=tf.float32)
+        y_lf_t = tf.convert_to_tensor(Y_lf, dtype=tf.float32)
+        x_hf_t = tf.convert_to_tensor(X_hf, dtype=tf.float32)
+        y_hf_t = tf.convert_to_tensor(Y_hf, dtype=tf.float32)
 
         # ── Phase 1: LF KAN Pretraining ──────────────────────────────────
         if self.lf_pretrain_patience > 0:
-            lf_vars = _get_lf_vars()
             best_lf = float('inf')
             wait_lf = 0
             best_lf_weights = None
             for epoch in range(self.max_epochs):
-                with tf.GradientTape() as tape:
-                    y_pred_lf = self._forward_kan(X_lf_t)
-                    reg = sum(layer.regularization_loss(0.001) for layer in self.kan_lf)
-                    loss_lf = tf.reduce_mean(tf.square(y_pred_lf - Y_lf_t)) + reg
-                grads = tape.gradient(loss_lf, lf_vars)
-                self.optimizer.apply_gradients(zip(grads, lf_vars))
+                loss_lf = self.trainer.pretrain_step_lf(x_lf_t, y_lf_t)
                 val = float(loss_lf)
                 if val < best_lf:
                     best_lf = val
                     wait_lf = 0
-                    best_lf_weights = [v.numpy() for v in lf_vars]
+                    best_lf_weights = [v.numpy() for v in self.trainer.kan_lf.trainable_variables]
                 else:
                     wait_lf += 1
                     if wait_lf >= self.lf_pretrain_patience:
@@ -322,25 +220,32 @@ class HybridKANDNN:
                             print(f"LF pretrain done at epoch {epoch}, loss_lf={best_lf:.6f}")
                         break
             if best_lf_weights is not None:
-                for v, val in zip(lf_vars, best_lf_weights):
+                for v, val in zip(self.trainer.kan_lf.trainable_variables, best_lf_weights):
                     v.assign(val)
 
         # ── Phase 2: Joint Fine-tuning ────────────────────────────────────
         best_loss = float('inf')
         wait = 0
         best_weights = None
+        training_history = []
 
         for epoch in range(self.max_epochs):
-            loss, loss_lf, loss_hf = self._train_step(
-                X_lf_t, Y_lf_t, X_hf_t, Y_hf_t
+            loss, loss_lf, loss_hf = self.trainer.train_step(
+                x_lf_t, y_lf_t, x_hf_t, y_hf_t
             )
 
             loss_val = float(loss)
+            training_history.append({
+                'epoch': epoch,
+                'loss': loss_val,
+                'loss_lf': float(loss_lf),
+                'loss_hf': float(loss_hf)
+            })
 
             if loss_val < best_loss:
                 best_loss = loss_val
                 wait = 0
-                best_weights = [v.numpy() for v in _get_all_vars()]
+                best_weights = [v.numpy() for v in self.trainer.trainable_variables]
             else:
                 wait += 1
                 if wait >= self.patience:
@@ -350,73 +255,58 @@ class HybridKANDNN:
 
             if self.verbose and epoch % 5000 == 0:
                 print(f"Epoch {epoch}: loss={loss_val:.6f}, "
-                      f"LF={float(loss_lf):.6f}, HF={float(loss_hf):.6f}, "
-                      f"rho={float(self.rho):.3f}")
+                      f"LF={float(loss_lf):.6f}, HF={float(loss_hf):.6f}")
 
-        # Restore best weights
         if best_weights is not None:
-            for v, val in zip(_get_all_vars(), best_weights):
+            for v, val in zip(self.trainer.trainable_variables, best_weights):
                 v.assign(val)
 
         self.is_trained = True
-        
+
         return {
             'final_loss': best_loss,
-            'epochs': epoch + 1,
-            'rho': float(self.rho),
-            'bias': float(self.bias)
+            'epochs_trained': epoch + 1,
+            'history': training_history
         }
-    
+
     def predict(self, X: np.ndarray, return_std: bool = True,
                 n_mc_samples: int = 100) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         """
-        Predict HF output with MC Dropout uncertainty.
-        
+        Predict HF output (normalized space — caller/wrapper denormalizes).
+
         Args:
-            X: Input locations
-            return_std: Whether to return uncertainty
-            n_mc_samples: Number of MC samples for uncertainty
-        
+            X: Input locations (N, D) — pre-normalized
+            return_std: Whether to return std
+
         Returns:
-            mean: Predicted HF mean
-            std: Predicted HF std (from MC Dropout)
+            mean: Predicted HF values (normalized)
+            std: Zeros placeholder (no MC Dropout in this architecture)
         """
         if not self.is_trained:
             raise RuntimeError("Model not trained. Call fit() first.")
-        
-        X = np.asarray(X, dtype=np.float32)
-        X_t = tf.constant(X, dtype=tf.float32)  # caller pre-normalizes
+
+        X_t = tf.convert_to_tensor(np.asarray(X, dtype=np.float32))
+        y_hf, _ = self.trainer.predict(X_t)
+        mean = y_hf.numpy()
 
         if return_std:
-            # MC Dropout: multiple forward passes with dropout enabled
-            predictions = []
-            for _ in range(n_mc_samples):
-                _, y_hf, _ = self._forward(X_t, training=True)
-                predictions.append(y_hf.numpy())
-
-            predictions = np.array(predictions)
-            mean_n = np.mean(predictions, axis=0)
-            std_n = np.std(predictions, axis=0)
-
-            return mean_n, std_n  # caller denormalizes
-        else:
-            _, y_hf, _ = self._forward(X_t, training=False)
-            return y_hf.numpy(), None  # caller denormalizes
+            # No native uncertainty; use DeepEnsemble wrapper for real std.
+            std = np.full_like(mean, np.nan)
+            return mean, std
+        return mean, None
 
     def predict_lf(self, X: np.ndarray) -> np.ndarray:
-        """Predict LF output from KAN (in normalized space — caller denormalizes)."""
+        """Predict LF output from KAN (normalized space — caller denormalizes)."""
         if not self.is_trained:
             raise RuntimeError("Model not trained. Call fit() first.")
 
-        X = np.asarray(X, dtype=np.float32)
-        X_t = tf.constant(X, dtype=tf.float32)
-
-        y_lf = self._forward_kan(X_t)
+        X_t = tf.convert_to_tensor(np.asarray(X, dtype=np.float32))
+        _, y_lf = self.trainer.predict(X_t)
         return y_lf.numpy()
-    
-    def get_learned_rho(self) -> float:
-        """Get the learned LF-to-HF scaling factor."""
-        return float(self.rho) if self.rho is not None else None
+
+    def get_learned_rho(self) -> Optional[float]:
+        """Not applicable for this architecture (no rho scaling). Returns None."""
+        return None
 
 
 # ============================================================
@@ -424,29 +314,28 @@ class HybridKANDNN:
 # ============================================================
 if __name__ == "__main__":
     print("Testing Hybrid KAN+DNN model...")
-    
-    import os
+
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    
+
     np.random.seed(42)
-    
-    # Synthetic data
+
     X_lf = np.random.rand(100, 2).astype(np.float32)
     Y_lf = (np.sin(2 * np.pi * X_lf[:, 0:1]) + 0.1 * np.random.randn(100, 1)).astype(np.float32)
-    
+
     X_hf = np.random.rand(12, 2).astype(np.float32)
     Y_hf = (np.sin(2 * np.pi * X_hf[:, 0:1]) + 0.5 * X_hf[:, 1:2]).astype(np.float32)
-    
-    # Train
+
     model = HybridKANDNN(max_epochs=3000, patience=300, verbose=True)
     info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
-    print(f"\nTraining complete: {info}")
-    
-    # Predict
+    print(f"\nFinal loss: {info['final_loss']:.6f}")
+    print(f"Epochs trained: {info['epochs_trained']}")
+
     X_test = np.random.rand(5, 2).astype(np.float32)
     y_pred, y_std = model.predict(X_test, return_std=True)
-    print(f"\nPredictions: {y_pred.flatten()}")
-    print(f"Uncertainties: {y_std.flatten()}")
-    print(f"Learned rho: {model.get_learned_rho():.3f}")
-    
-    print("\n✓ Hybrid KAN+DNN test passed!")
+    print(f"Predictions shape: {y_pred.shape}")
+    print(f"Sample predictions: {y_pred.flatten()[:3]}")
+
+    y_lf = model.predict_lf(X_test)
+    print(f"LF predictions: {y_lf.flatten()[:3]}")
+
+    print("\nHybrid KAN+DNN test passed!")
