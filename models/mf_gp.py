@@ -67,7 +67,7 @@ class SingleFidelityGP:
             pass
         
         # Optimize with restarts
-        self.model.optimize_restarts(num_restarts=self.num_restarts, verbose=False)
+        self.model.optimize_restarts(num_restarts=self.num_restarts, verbose=True)
         
         self.is_trained = True
         
