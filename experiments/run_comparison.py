@@ -15,6 +15,8 @@ import sys
 import os
 import numpy as np
 import warnings
+import time
+
 warnings.filterwarnings('ignore')
 
 # Add project root to path
@@ -133,9 +135,9 @@ def run_loo_comparison(data: dict, model_factories: dict,
                 lambda: NormalizingModelWrapper(f()), n_models=5
             )
 
-
+        t_start = time.time()
         try:
-            metrics = run_loo_cv( 
+            metrics = run_loo_cv(
                 model_factory=effective_factory,
                 X_lf=data['X_lf'],
                 Y_lf=data['Y_lf'],
@@ -143,8 +145,11 @@ def run_loo_comparison(data: dict, model_factories: dict,
                 Y_hf=data['Y_hf_train'],
                 verbose=verbose
             )
+            elapsed = time.time() - t_start
+            print(f"  Time: {elapsed:.1f}s ({elapsed/60:.1f} min)")
         except Exception as e:
-            print(f"\n  !! {name} LOO-CV failed: {e}")
+            elapsed = time.time() - t_start
+            print(f"\n  !! {name} LOO-CV failed after {elapsed:.1f}s ({elapsed/60:.1f} min): {e}")
             import traceback
             traceback.print_exc()
             results[name] = None
@@ -176,7 +181,8 @@ def run_noise_ablation(data: dict, model_factories: dict,
         
         for name, factory in model_factories.items():
             trial_metrics = []
-            
+            t_model_start = time.time()
+
             for trial in range(n_trials):
                 # Add noise
                 Y_hf_noisy, _ = add_noise(
@@ -202,8 +208,9 @@ def run_noise_ablation(data: dict, model_factories: dict,
                 avg_metrics[f'{key}_mean'] = np.mean(values)
                 avg_metrics[f'{key}_std'] = np.std(values)
             
+            elapsed = time.time() - t_model_start
             results[name][noise_level] = avg_metrics
-            print(f"  {name}: RMSE = {avg_metrics['rmse_mean']:.4f} ± {avg_metrics['rmse_std']:.4f}")
+            print(f"  {name}: RMSE = {avg_metrics['rmse_mean']:.4f} ± {avg_metrics['rmse_std']:.4f}  [{elapsed:.1f}s]")
     
     return results
 
@@ -337,9 +344,12 @@ def train_all_models(data: dict, model_factories: dict) -> tuple:
 
     for name, factory in model_factories.items():
         print(f"  Training {name}...")
+        t_start = time.time()
         m = NormalizingModelWrapper(factory())
         info = m.fit(data['X_lf'], data['Y_lf'],
                      data['X_hf_train'], data['Y_hf_train'])
+        elapsed = time.time() - t_start
+        print(f"  {name} done: {elapsed:.1f}s ({elapsed/60:.1f} min)")
         trained[name] = m
         if info and 'history' in info:
             training_histories[name] = info['history']
@@ -354,9 +364,12 @@ def train_all_models(data: dict, model_factories: dict) -> tuple:
         factory = model_factories[name]
         wrapped_factory = lambda f=factory: NormalizingModelWrapper(f())
         ens = DeepEnsemble(wrapped_factory, n_models=5)
+        t_start = time.time()
         ens.fit(data['X_lf'], data['Y_lf'],
                 data['X_hf_train'], data['Y_hf_train'],
                 verbose=False)
+        elapsed = time.time() - t_start
+        print(f"  {name}-Ensemble done: {elapsed:.1f}s ({elapsed/60:.1f} min)")
         trained[f'{name}-Ensemble'] = ens
 
     return trained, training_histories

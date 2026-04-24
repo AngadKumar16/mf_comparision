@@ -72,7 +72,7 @@ KAN_CONFIG = {
 HYBRID_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
     'layers_hf_nl': [3, 32, 32, 1],
-    'layers_hf_l': [3, 1],
+    'layers_hf_l': [1, 1],
     'grid_size': 5,
     'spline_order': 3,
     'learning_rate': 0.001,
