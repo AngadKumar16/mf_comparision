@@ -94,15 +94,13 @@ def create_model_factories():
         ),
 
         'Hybrid': lambda: HybridKANDNN(
-            kan_layers=HYBRID_CONFIG['kan_layers'],
-            mlp_layers=HYBRID_CONFIG['mlp_layers'],
-            kan_grid_size=HYBRID_CONFIG['kan_grid_size'],
-            kan_spline_order=HYBRID_CONFIG['kan_spline_order'],
-            dropout_rate=HYBRID_CONFIG['dropout_rate'],
-            max_epochs=HYBRID_CONFIG['max_epochs'],
-            patience=HYBRID_CONFIG['patience'],
-            lf_pretrain_patience=HYBRID_CONFIG.get('lf_pretrain_patience', 500),
-            verbose=False
+            layers_lf=HYBRID_CONFIG['layers_lf'],
+            layers_hf_nl=HYBRID_CONFIG['layers_hf_nl'],
+            layers_hf_l=HYBRID_CONFIG['layers_hf_l'],
+            grid_size=HYBRID_CONFIG['grid_size'],
+            spline_order=HYBRID_CONFIG['spline_order'],
+            learning_rate=HYBRID_CONFIG['learning_rate'],
+            l2_reg=HYBRID_CONFIG['l2_reg'],
         ),
     }
 
@@ -129,12 +127,15 @@ def run_loo_comparison(data: dict, model_factories: dict,
             print(f"Running LOO-CV for {name}")
             print('='*50)
 
-        effective_factory = factory
+        effective_factory = lambda f=factory: NormalizingModelWrapper(f())
         if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
-            effective_factory = lambda f=factory: DeepEnsemble(f, n_models=5)
+            effective_factory = lambda f=factory: DeepEnsemble(
+                lambda: NormalizingModelWrapper(f()), n_models=5
+            )
+
 
         try:
-            metrics = run_loo_cv(
+            metrics = run_loo_cv( 
                 model_factory=effective_factory,
                 X_lf=data['X_lf'],
                 Y_lf=data['Y_lf'],
@@ -146,6 +147,7 @@ def run_loo_comparison(data: dict, model_factories: dict,
             print(f"\n  !! {name} LOO-CV failed: {e}")
             import traceback
             traceback.print_exc()
+            results[name] = None
             continue
 
         results[name] = metrics
@@ -223,6 +225,8 @@ def generate_plots(data: dict, loo_results: dict,
 
     # 1. LOO scatter plots for each model
     for name, metrics in loo_results.items():
+        if metrics is None:
+            continue
         save_path = FIGURES_DIR / f'loo_{name.lower().replace("-", "_")}.png' if save else None
         plot_loo_scatter(
             metrics['y_true'],
@@ -237,7 +241,7 @@ def generate_plots(data: dict, loo_results: dict,
         'rmse': metrics['rmse'],
         'mae': metrics['mae'],
         'r2': metrics['r2']
-    } for name, metrics in loo_results.items()}
+    } for name, metrics in loo_results.items() if metrics is not None}
 
     save_path = FIGURES_DIR / 'model_comparison.png' if save else None
     plot_model_comparison_bars(comparison_data, save_path=save_path)
@@ -291,6 +295,7 @@ def save_results_csv(loo_results: dict, noise_results: dict = None):
             'Coverage 90%': metrics.get('coverage_90', np.nan)
         }
         for name, metrics in loo_results.items()
+        if metrics is not None
     }).T
 
     loo_df.to_csv(RESULTS_DIR / 'loo_results.csv')
@@ -462,7 +467,11 @@ def main(use_synthetic: bool = False,
     print("\nLOO-CV Results:")
     print("-"*40)
     for name, metrics in loo_results.items():
+        if metrics is None:
+            print(f"  {name:15s}: FAILED")
+            continue
         print(f"  {name:15s}: RMSE={metrics['rmse']:.4f}, R²={metrics['r2']:.4f}")
+
 
     if noise_results:
         print("\nNoise Robustness (RMSE at 10% noise):")
@@ -485,7 +494,9 @@ def _loo_scalars(loo_results: dict) -> dict:
     return {
         model: {k: v for k, v in m.items() if k in scalar_keys}
         for model, m in loo_results.items()
+        if m is not None
     }
+
 
 
 def save_scenario_csv(scenario_results: dict, save_path: str):
@@ -615,14 +626,14 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
     print("\n[1/3] Forrester (synthetic) — LOO-CV...")
     forr_data = load_data(use_synthetic=True)
     forr_fac  = create_model_factories()
-    forr_loo  = run_loo_comparison(forr_data, forr_fac, verbose=True)
+    forr_loo = run_loo_comparison(forr_data, forr_fac, verbose=True)
     scenario_results['Forrester'] = _loo_scalars(forr_loo)
 
     # ── 2. Real data, clean ───────────────────────────────────────────
     print("\n[2/3] Real data (clean) — LOO-CV...")
     real_data = load_data(use_synthetic=False)
     real_fac  = create_model_factories()
-    real_loo  = run_loo_comparison(real_data, real_fac, verbose=True)
+    real_loo = run_loo_comparison(real_data, real_fac, verbose=True)
     scenario_results['Real (clean)'] = _loo_scalars(real_loo)
 
     # ── 3. Noise ablation on real data ────────────────────────────────

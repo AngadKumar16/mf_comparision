@@ -70,15 +70,18 @@ KAN_CONFIG = {
 
 # Hybrid KAN+DNN (NOVELTY)
 HYBRID_CONFIG = {
-    'kan_layers': [2, 20, 20, 1],
-    'mlp_layers': [3, 32, 32, 1],
-    'kan_grid_size': 5,
-    'kan_spline_order': 3,
-    'dropout_rate': 0.1,
+    'layers_lf': [2, 20, 20, 1],
+    'layers_hf_nl': [3, 32, 32, 1],
+    'layers_hf_l': [3, 1],
+    'grid_size': 5,
+    'spline_order': 3,
+    'learning_rate': 0.001,
+    'l2_reg': 0.01,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
+
  
 # ============================================================
 # EXPERIMENT CONFIGURATION
