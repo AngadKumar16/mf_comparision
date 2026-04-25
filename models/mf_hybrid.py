@@ -319,6 +319,7 @@ class HybridKANDNN:
 if __name__ == "__main__":
     print("Testing Hybrid KAN+DNN model...")
 
+    import time
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     np.random.seed(42)
@@ -330,14 +331,24 @@ if __name__ == "__main__":
     Y_hf = (np.sin(2 * np.pi * X_hf[:, 0:1]) + 0.5 * X_hf[:, 1:2]).astype(np.float32)
 
     model = HybridKANDNN(max_epochs=3000, patience=300, verbose=True)
+
+    t_fit_start = time.time()
     info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
+    fit_elapsed = time.time() - t_fit_start
+
     print(f"\nFinal loss: {info['final_loss']:.6f}")
     print(f"Epochs trained: {info['epochs_trained']}")
+    print(f"Fit time: {fit_elapsed:.2f}s ({info['epochs_trained']/fit_elapsed:.1f} epochs/sec)")
 
     X_test = np.random.rand(5, 2).astype(np.float32)
+
+    t_pred_start = time.time()
     y_pred, y_std = model.predict(X_test, return_std=True)
-    print(f"Predictions shape: {y_pred.shape}")
+    pred_elapsed = time.time() - t_pred_start
+
+    print(f"\nPredictions shape: {y_pred.shape}")
     print(f"Sample predictions: {y_pred.flatten()[:3]}")
+    print(f"Predict time: {pred_elapsed*1000:.2f}ms")
 
     y_lf = model.predict_lf(X_test)
     print(f"LF predictions: {y_lf.flatten()[:3]}")
