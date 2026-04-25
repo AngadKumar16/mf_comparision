@@ -39,9 +39,9 @@ GP_CONFIG = {
 ## ============================================================
 # SHARED TRAINING BUDGET
 # ============================================================
-MAX_EPOCHS = 10000          # Safety ceiling; early stopping does the real work
-LF_PRETRAIN_PATIENCE = 500  # Phase 1: stop LF pretraining after no improvement
-JOINT_PATIENCE = 2000       # Phase 2: stop joint training after no improvement
+MAX_EPOCHS = 5000          # Safety ceiling; early stopping does the real work
+LF_PRETRAIN_PATIENCE = 200  # Phase 1: stop LF pretraining after no improvement
+JOINT_PATIENCE = 500       # Phase 2: stop joint training after no improvement
 
 # Deep Neural Network
 DNN_CONFIG = {

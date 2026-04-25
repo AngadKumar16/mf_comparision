@@ -108,6 +108,7 @@ class MFTrainer(tf.Module):
         self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.lf_optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
 
+    @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
                    x_hf_coords: tf.Tensor, y_hf: tf.Tensor
                    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -168,6 +169,7 @@ class MFTrainer(tf.Module):
         y_pred_hf = y_pred_hf_l + y_pred_hf_nl
         return y_pred_hf, y_pred_lf
 
+    @tf.function
     def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
         """Single LF-only training step (Phase 1 pretraining)."""
         lf_vars = self.W_lf + self.b_lf

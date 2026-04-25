@@ -425,8 +425,7 @@ def main(use_synthetic: bool = False,
 
     # Set random seed
     np.random.seed(RANDOM_SEED)
-    t_total_start = time.time()
-
+    
     # 1. Load data
     print("\n[1/5] Loading data...")
     data = load_data(use_synthetic=use_synthetic)
@@ -631,6 +630,7 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
     from utils.visualization import plot_scenario_comparison
 
     np.random.seed(RANDOM_SEED)
+    t_start = time.time()
 
     print("=" * 60)
     print("CROSS-SCENARIO MODEL COMPARISON")
