@@ -117,22 +117,20 @@ class KANLayer(tf.Module):
         num_grid = self.grid_size + 1 + 2 * self.spline_order
 
         # Recursion for higher orders
-        current_num_grid = self.grid_size + 1 + 2 * self.spline_order
 
         for order in range(1, k + 1):
-            num = x_expanded - grid_expanded[:, :, :current_num_grid - 1 - order]
-            den = grid_expanded[:, :, order:current_num_grid - 1] - grid_expanded[:, :, :current_num_grid - 1 - order] + 1e-8
+            static_basis_size = self.grid_size + 2 * self.spline_order - order
+
+            num = x_expanded - grid_expanded[:, :, :num_grid - 1 - order]
+            den = grid_expanded[:, :, order:num_grid - 1] - grid_expanded[:, :, :num_grid - 1 - order] + 1e-8
             w1 = num / den
 
-            num = grid_expanded[:, :, order + 1:current_num_grid - order + 1] - x_expanded
-            den = grid_expanded[:, :, order + 1:current_num_grid - order + 1] - grid_expanded[:, :, 1:current_num_grid - order] + 1e-8
+            num = grid_expanded[:, :, order + 1:] - x_expanded
+            den = grid_expanded[:, :, order + 1:] - grid_expanded[:, :, 1:num_grid - order] + 1e-8
             w2 = num / den
 
-            static_basis_size = self.grid_size + 2 * self.spline_order - order
             basis = w1[:, :, :static_basis_size] * basis[:, :, :-1] + \
-                    w2[:, :, :static_basis_size] * basis[:, :, 1:]
-            
-            current_num_grid -= 1  # ← shrink each step
+            w2[:, :, :static_basis_size] * basis[:, :, 1:]
 
         return basis
     

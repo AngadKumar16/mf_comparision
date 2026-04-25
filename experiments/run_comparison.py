@@ -103,6 +103,9 @@ def create_model_factories():
             spline_order=HYBRID_CONFIG['spline_order'],
             learning_rate=HYBRID_CONFIG['learning_rate'],
             l2_reg=HYBRID_CONFIG['l2_reg'],
+            max_epochs=HYBRID_CONFIG['max_epochs'],
+            patience=HYBRID_CONFIG['patience'],
+            lf_pretrain_patience=HYBRID_CONFIG['lf_pretrain_patience'],
         ),
     }
 
@@ -722,7 +725,9 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
                   f" {m.get('mae',  np.nan):>8.4f}"
                   f" {m.get('r2',   np.nan):>8.4f}")
 
-    print("\n✓ Done {total_elapsed:.1f}s ({total_elapsed/60:.1f} min).")
+    total_elapsed = time.time() - t_start
+    print(f"\n✓ Done in {total_elapsed:.1f}s ({total_elapsed/60:.1f} min).")
+
     if save:
         print(f"  Results: {RESULTS_DIR}")
         print(f"  Figures: {FIGURES_DIR}")
