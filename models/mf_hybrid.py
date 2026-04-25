@@ -74,6 +74,7 @@ class MFHybridTrainer(tf.Module):
             + [self.W_hf_l, self.b_hf_l]
         )
 
+    @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
                    x_hf_coords: tf.Tensor, y_hf: tf.Tensor
                    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -104,6 +105,7 @@ class MFHybridTrainer(tf.Module):
         self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
         return loss, loss_lf, loss_hf
 
+    @tf.function
     def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
         """Single LF-only training step (Phase 1 pretraining)."""
         lf_vars = self.kan_lf.trainable_variables
@@ -293,7 +295,7 @@ class HybridKANDNN:
 
         if return_std:
             # No native uncertainty; use DeepEnsemble wrapper for real std.
-            std = np.full_like(mean, np.nan)
+            std = np.zeros_like(mean)
             return mean, std
         return mean, None
 
