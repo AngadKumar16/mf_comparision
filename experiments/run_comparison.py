@@ -129,10 +129,10 @@ def run_loo_comparison(data: dict, model_factories: dict,
             print(f"Running LOO-CV for {name}")
             print('='*50)
 
-        effective_factory = lambda f=factory: NormalizingModelWrapper(f())
+        effective_factory = factory
         if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
             effective_factory = lambda f=factory: DeepEnsemble(
-                lambda: NormalizingModelWrapper(f()), n_models=5
+                f, n_models=5
             )
 
         t_start = time.time()
@@ -422,6 +422,7 @@ def main(use_synthetic: bool = False,
 
     # Set random seed
     np.random.seed(RANDOM_SEED)
+    t_total_start = time.time()
 
     # 1. Load data
     print("\n[1/5] Loading data...")
@@ -637,26 +638,32 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
 
     # ── 1. Forrester (synthetic) ──────────────────────────────────────
     print("\n[1/3] Forrester (synthetic) — LOO-CV...")
+    t1 = time.time()
     forr_data = load_data(use_synthetic=True)
     forr_fac  = create_model_factories()
     forr_loo = run_loo_comparison(forr_data, forr_fac, verbose=True)
     scenario_results['Forrester'] = _loo_scalars(forr_loo)
+    print(f"  [1/3] Forrester total: {time.time()-t1:.1f}s ({(time.time()-t1)/60:.1f} min)")
 
     # ── 2. Real data, clean ───────────────────────────────────────────
     print("\n[2/3] Real data (clean) — LOO-CV...")
+    t2 = time.time()
     real_data = load_data(use_synthetic=False)
     real_fac  = create_model_factories()
     real_loo = run_loo_comparison(real_data, real_fac, verbose=True)
     scenario_results['Real (clean)'] = _loo_scalars(real_loo)
+    print(f"  [2/3] Real (clean) total: {time.time()-t2:.1f}s ({(time.time()-t2)/60:.1f} min)")
 
     # ── 3. Noise ablation on real data ────────────────────────────────
     if run_noise:
         print("\n[3/3] Real data — noise ablation...")
+        t3 = time.time()
         noise_results = run_noise_ablation(
             real_data, real_fac,
             noise_levels=NOISE_LEVELS,
             n_trials=N_NOISE_TRIALS,
         )
+        print(f"  [3/3] Noise ablation total: {time.time()-t3:.1f}s ({(time.time()-t3)/60:.1f} min)")
     else:
         print("\n[3/3] Skipping noise ablation (add --noise to enable)")
 
@@ -715,7 +722,7 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
                   f" {m.get('mae',  np.nan):>8.4f}"
                   f" {m.get('r2',   np.nan):>8.4f}")
 
-    print("\n✓ Done.")
+    print("\n✓ Done {total_elapsed:.1f}s ({total_elapsed/60:.1f} min).")
     if save:
         print(f"  Results: {RESULTS_DIR}")
         print(f"  Figures: {FIGURES_DIR}")

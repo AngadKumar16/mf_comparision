@@ -117,22 +117,23 @@ class KANLayer(tf.Module):
         num_grid = self.grid_size + 1 + 2 * self.spline_order
 
         # Recursion for higher orders
-        for order in range(1, k + 1):
-            # Static size: initial basis has (grid_size + 2*spline_order) elements,
-            # shrinks by 1 each step
-            static_basis_size = self.grid_size + 2 * self.spline_order - order
+        current_num_grid = self.grid_size + 1 + 2 * self.spline_order
 
-            num = x_expanded - grid_expanded[:, :, :num_grid - 1 - order]
-            den = grid_expanded[:, :, order:num_grid - 1] - grid_expanded[:, :, :num_grid - 1 - order] + 1e-8
+        for order in range(1, k + 1):
+            num = x_expanded - grid_expanded[:, :, :current_num_grid - 1 - order]
+            den = grid_expanded[:, :, order:current_num_grid - 1] - grid_expanded[:, :, :current_num_grid - 1 - order] + 1e-8
             w1 = num / den
 
-            num = grid_expanded[:, :, order + 1:] - x_expanded
-            den = grid_expanded[:, :, order + 1:] - grid_expanded[:, :, 1:num_grid - order] + 1e-8
+            num = grid_expanded[:, :, order + 1:current_num_grid - order + 1] - x_expanded
+            den = grid_expanded[:, :, order + 1:current_num_grid - order + 1] - grid_expanded[:, :, 1:current_num_grid - order] + 1e-8
             w2 = num / den
 
+            static_basis_size = self.grid_size + 2 * self.spline_order - order
             basis = w1[:, :, :static_basis_size] * basis[:, :, :-1] + \
                     w2[:, :, :static_basis_size] * basis[:, :, 1:]
-        
+            
+            current_num_grid -= 1  # ← shrink each step
+
         return basis
     
     def __call__(self, x: tf.Tensor) -> tf.Tensor:
@@ -409,7 +410,7 @@ class MFKAN:
                     wait_lf += 1
                     if wait_lf >= self.lf_pretrain_patience:
                         if self.verbose and epoch % 5000 == 0:
-                            print(f"Epoch {epoch}: loss={loss_val:.6f} | time={time.strftime('%H:%M:%S')}")
+                            print(f"Epoch {epoch}: loss={val:.6f} | time={time.strftime('%H:%M:%S')}")
                         break
             if best_lf_weights is not None:
                 for v, val in zip(self.trainer.kan_lf.trainable_variables, best_lf_weights):
@@ -479,7 +480,7 @@ class MFKAN:
 
         if return_std:
             # No native uncertainty; use DeepEnsemble wrapper for real std.
-            std = np.full_like(y_hf, np.nan)
+            std = np.zeros_like(y_hf)
             return y_hf, std
         return y_hf, None
 
@@ -508,7 +509,7 @@ if __name__ == "__main__":
     X_hf = np.random.rand(12, 2).astype(np.float32)
     Y_hf = (np.sin(2 * np.pi * X_hf[:, 0:1]) + 0.5 * X_hf[:, 1:2]).astype(np.float32)
 
-    model = MFKAN(max_epochs=10000, patience=1000, verbose=True)
+    model = MFKAN(max_epochs=5000, patience=1000, verbose=True)
     info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
     print(f"Final loss: {info['final_loss']:.6f}, Epochs: {info['epochs_trained']}")
 

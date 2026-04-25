@@ -202,7 +202,7 @@ class MFDNN:
                  layers_hf_nl: List[int] = None,
                  layers_hf_l: List[int] = None,
                  learning_rate: float = 0.001,
-                 max_epochs: int = 30000,
+                 max_epochs: int = 5000,
                  patience: int = 2000,
                  l2_reg: float = 0.01,
                  lf_pretrain_patience: int = 500,
@@ -274,7 +274,7 @@ class MFDNN:
                     if wait_lf >= self.lf_pretrain_patience:
                         if self.verbose and epoch % 5000 == 0:
                             import time
-                            print(f"Epoch {epoch}: loss={loss_val:.6f} | time={time.strftime('%H:%M:%S')}")
+                            print(f"Epoch {epoch}: loss={val:.6f} | time={time.strftime('%H:%M:%S')}")
                         break
             if best_lf_weights is not None:
                 for w, v in zip(self.trainer.W_lf + self.trainer.b_lf, best_lf_weights):
@@ -347,7 +347,8 @@ class MFDNN:
 
         if return_std:
             # No native uncertainty; use DeepEnsemble wrapper for real std.
-            std = np.full_like(mean, np.nan)
+            std = np.zeros_like(mean)
+
             return mean, std
         return mean, None
 
