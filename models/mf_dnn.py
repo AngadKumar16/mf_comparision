@@ -371,6 +371,7 @@ if __name__ == "__main__":
     print("Testing MF-DNN with synthetic data...")
 
     import os
+    import time
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     np.random.seed(42)
@@ -383,13 +384,23 @@ if __name__ == "__main__":
 
     print("\nTesting MFDNN...")
     model = MFDNN(max_epochs=5000, patience=500, verbose=True)
+
+    t_fit_start = time.time()
     info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
+    fit_elapsed = time.time() - t_fit_start
+
     print(f"\nFinal loss: {info['final_loss']:.6f}")
     print(f"Epochs trained: {info['epochs_trained']}")
+    print(f"Fit time: {fit_elapsed:.2f}s ({info['epochs_trained']/fit_elapsed:.1f} epochs/sec)")
 
     X_test = np.random.rand(5, 2).astype(np.float32)
+
+    t_pred_start = time.time()
     y_pred, y_std = model.predict(X_test)
+    pred_elapsed = time.time() - t_pred_start
+
     print(f"\nPredictions shape: {y_pred.shape}")
     print(f"Sample predictions: {y_pred.flatten()[:3]}")
+    print(f"Predict time: {pred_elapsed*1000:.2f}ms")
 
     print("\n✓ MF-DNN tests passed!")
