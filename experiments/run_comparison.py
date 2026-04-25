@@ -13,6 +13,9 @@ Run from project root:
 
 import sys
 import os
+os.environ['TF_DISABLE_METAL'] = '1'
+import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
 import numpy as np
 import warnings
 import time

@@ -13,9 +13,11 @@ Reference: Liu et al., "KAN: Kolmogorov-Arnold Networks" (2024)
 """
 
 import os
+os.environ['TF_DISABLE_METAL'] = '1'
+import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
 import time
 
-import tensorflow as tf
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
 

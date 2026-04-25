@@ -10,7 +10,10 @@ Normalization is handled externally by NormalizingModelWrapper in utils/data_uti
 Models receive pre-normalized data in [-1, 1] and return normalized outputs.
 """
 
+import os
+os.environ['TF_DISABLE_METAL'] = '1'
 import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
 import numpy as np
 from typing import Tuple, Optional, Dict, Any, List
 
