@@ -57,6 +57,7 @@ class DeepEnsemble:
             seed = 42 + i * 1000
             np.random.seed(seed)
             tf.random.set_seed(seed)
+            tf.keras.utils.set_random_seed(seed)
             
             # Create and train model
             model = self.model_factory()

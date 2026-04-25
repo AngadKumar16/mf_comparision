@@ -39,14 +39,14 @@ GP_CONFIG = {
 ## ============================================================
 # SHARED TRAINING BUDGET
 # ============================================================
-MAX_EPOCHS = 5000          # Safety ceiling; early stopping does the real work
-LF_PRETRAIN_PATIENCE = 200  # Phase 1: stop LF pretraining after no improvement
-JOINT_PATIENCE = 500       # Phase 2: stop joint training after no improvement
+MAX_EPOCHS = 10000          # Safety ceiling; early stopping does the real work
+LF_PRETRAIN_PATIENCE = 500  # Phase 1: stop LF pretraining after no improvement
+JOINT_PATIENCE = 2000       # Phase 2: stop joint training after no improvement
 
 # Deep Neural Network
 DNN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 8, 1],
+    'layers_hf_nl': [3, 10, 10, 1],
     'layers_hf_l': [3, 1],
     'learning_rate': 0.001,
     'max_epochs': MAX_EPOCHS,
@@ -71,8 +71,8 @@ KAN_CONFIG = {
 # Hybrid KAN+DNN (NOVELTY)
 HYBRID_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 32, 32, 1],
-    'layers_hf_l': [1, 1],
+    'layers_hf_nl': [3, 10, 10, 1],
+    'layers_hf_l': [3, 1],
     'grid_size': 5,
     'spline_order': 3,
     'learning_rate': 0.001,
