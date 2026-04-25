@@ -1,0 +1,877 @@
+============================================================
+CROSS-SCENARIO MODEL COMPARISON
+============================================================
+
+[1/3] Forrester (synthetic) — LOO-CV...
+Using synthetic Forrester data...
+
+==================================================
+Running LOO-CV for GP-Linear
+==================================================
+
+Running LOO-CV for Model (12 folds)...
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137061036811
+Optimization restart 3/10, f = -1013.913707193668
+Optimization restart 4/10, f = -1013.9137067186521
+Optimization restart 5/10, f = -1013.9137069173778
+Optimization restart 6/10, f = -1013.9137078550923
+Optimization restart 7/10, f = -1013.913707476363
+Optimization restart 8/10, f = -1013.913700446433
+Optimization restart 9/10, f = -1013.9137059157217
+Optimization restart 10/10, f = -1013.9137057773128
+Optimization restart 1/10, f = -1050.1488407944266
+Optimization restart 2/10, f = -1056.0584323256724
+Optimization restart 3/10, f = -1050.8222310802657
+Optimization restart 4/10, f = -1052.31541320399
+Optimization restart 5/10, f = -1051.6214390480445
+Optimization restart 6/10, f = -1055.9842513015967
+Optimization restart 7/10, f = -1055.9607277177824
+Optimization restart 8/10, f = -1053.074080169415
+Optimization restart 9/10, f = -1050.022624091878
+Optimization restart 10/10, f = -1016.2927672242429
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137072708497
+Optimization restart 3/10, f = -1013.9136985235361
+Optimization restart 4/10, f = -1013.9137052408526
+Optimization restart 5/10, f = -1013.9137073437546
+Optimization restart 6/10, f = -1013.9137044971442
+Optimization restart 7/10, f = -1013.9137066796893
+Optimization restart 8/10, f = -1013.9137027147906
+Optimization restart 9/10, f = -1013.9137028158466
+Optimization restart 10/10, f = -1013.9136893114967
+Optimization restart 1/10, f = -1048.584014243358
+Optimization restart 2/10, f = -1052.9752841700472
+Optimization restart 3/10, f = -1048.7477132339768
+Optimization restart 4/10, f = -1050.7957208027365
+Optimization restart 5/10, f = -1048.5863087305945
+Optimization restart 6/10, f = -1047.4511409816378
+Optimization restart 7/10, f = -1050.2323598930502
+Optimization restart 8/10, f = -1049.3179635277716
+Optimization restart 9/10, f = -1046.8319736422886
+Optimization restart 10/10, f = -1050.6783135227008
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9136841448792
+Optimization restart 3/10, f = -1013.9136672018471
+Optimization restart 4/10, f = -1013.9137078502952
+Optimization restart 5/10, f = -1013.913707583645
+Optimization restart 6/10, f = -1013.9137062457255
+Optimization restart 7/10, f = -1013.913707723824
+Optimization restart 8/10, f = -1013.9132709073417
+Optimization restart 9/10, f = -1013.9137055593278
+Optimization restart 10/10, f = -1013.9137067048143
+Optimization restart 1/10, f = -1052.3546328415973
+Optimization restart 2/10, f = -1050.354859437767
+Optimization restart 3/10, f = -1049.522251799344
+Optimization restart 4/10, f = -1048.9176442054427
+Optimization restart 5/10, f = -1056.0178149076528
+Optimization restart 6/10, f = -1051.1192683209847
+Optimization restart 7/10, f = -1051.0678027203037
+Optimization restart 8/10, f = -1049.0344092752796
+Optimization restart 9/10, f = -1054.897263092324
+Optimization restart 10/10, f = -1056.3569073372373
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137092282215
+Optimization restart 3/10, f = -1013.9137023833875
+Optimization restart 4/10, f = -1013.9137087954002
+Optimization restart 5/10, f = -1013.9137071124255
+Optimization restart 6/10, f = -1013.9136970041425
+Optimization restart 7/10, f = -1013.9136803803151
+Optimization restart 8/10, f = -1013.913706052459
+Optimization restart 9/10, f = -1013.9137056986112
+Optimization restart 10/10, f = -1013.9081058785455
+Optimization restart 1/10, f = -1052.3126623785906
+Optimization restart 2/10, f = -1050.0607151456961
+Optimization restart 3/10, f = -1056.210446734326
+Optimization restart 4/10, f = -1055.2764027242333
+Optimization restart 5/10, f = -1050.9621997863062
+Optimization restart 6/10, f = -1055.6346933666232
+Optimization restart 7/10, f = -1051.6744946430078
+Optimization restart 8/10, f = -1054.6709496524895
+Optimization restart 9/10, f = -1053.1960014862655
+Optimization restart 10/10, f = -1056.4395312641554
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137048702332
+Optimization restart 3/10, f = -1013.9137085254126
+Optimization restart 4/10, f = -1013.913708291007
+Optimization restart 5/10, f = -1013.9137071039836
+Optimization restart 6/10, f = -1013.9137084228
+Optimization restart 7/10, f = -1013.9137038980441
+Optimization restart 8/10, f = -1013.9137010799216
+Optimization restart 9/10, f = -1013.9137071462467
+Optimization restart 10/10, f = -1013.9137060644427
+Optimization restart 1/10, f = -1055.7645062528547
+Optimization restart 2/10, f = -1050.522246201824
+Optimization restart 3/10, f = -1055.7800792557314
+Optimization restart 4/10, f = -1048.8783572442562
+Optimization restart 5/10, f = -1055.9009357569648
+Optimization restart 6/10, f = -1054.5170898112683
+Optimization restart 7/10, f = -1055.2131983953273
+Optimization restart 8/10, f = -1055.2860141999636
+Optimization restart 9/10, f = -1046.6442542269915
+Optimization restart 10/10, f = -1041.0608988143158
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137068839291
+Optimization restart 3/10, f = -1013.9137005682537
+Optimization restart 4/10, f = -1013.9098690729793
+Optimization restart 5/10, f = -1013.9137068803395
+Optimization restart 6/10, f = -1013.9137087938043
+Optimization restart 7/10, f = -1013.9136551354145
+Optimization restart 8/10, f = -1013.9137055356316
+Optimization restart 9/10, f = -1013.9137079492803
+Optimization restart 10/10, f = -1013.91369193538
+Optimization restart 1/10, f = -1048.8382435892452
+Optimization restart 2/10, f = -1055.6924398309318
+Optimization restart 3/10, f = -1051.6012832713752
+Optimization restart 4/10, f = -1047.2987170033389
+Optimization restart 5/10, f = -1053.3652738714204
+Optimization restart 6/10, f = -1050.7918481949232
+Optimization restart 7/10, f = -1051.5011019767944
+Optimization restart 8/10, f = -1050.4368957106037
+Optimization restart 9/10, f = -1054.9775014257827
+Optimization restart 10/10, f = -1050.5612056002653
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137059296659
+Optimization restart 3/10, f = -1013.9137058563254
+Optimization restart 4/10, f = -1013.9137060871756
+Optimization restart 5/10, f = -1013.9137024003203
+Optimization restart 6/10, f = -1013.9136180973851
+Optimization restart 7/10, f = -1013.913703346602
+Optimization restart 8/10, f = -1013.913703790292
+Optimization restart 9/10, f = -1013.9136867669015
+Optimization restart 10/10, f = -1013.9137066993351
+Optimization restart 1/10, f = -1059.0596099915563
+Optimization restart 2/10, f = -1058.8452415694687
+Optimization restart 3/10, f = -1057.3928883798058
+Optimization restart 4/10, f = -1058.9114391733724
+Optimization restart 5/10, f = -1053.2091714007884
+Optimization restart 6/10, f = -1053.1435136736427
+Optimization restart 7/10, f = -1058.1276346976888
+Optimization restart 8/10, f = -1053.8998867820549
+Optimization restart 9/10, f = -1052.7233924054547
+Optimization restart 10/10, f = -1052.245925481304
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137035837107
+Optimization restart 3/10, f = -1013.9137035579704
+Optimization restart 4/10, f = -1013.913707396317
+Optimization restart 5/10, f = -1013.9137035788654
+Optimization restart 6/10, f = -1013.9131166862758
+Optimization restart 7/10, f = -1013.9137093817728
+Optimization restart 8/10, f = -1013.9137058098081
+Optimization restart 9/10, f = -1013.9136872020074
+Optimization restart 10/10, f = -1013.9137080825928
+Optimization restart 1/10, f = -1055.9099173673528
+Optimization restart 2/10, f = -1055.622846225445
+Optimization restart 3/10, f = -1014.9110734481617
+Optimization restart 4/10, f = -1050.2662915147223
+Optimization restart 5/10, f = -1053.6954630876453
+Optimization restart 6/10, f = -1051.6224888605964
+Optimization restart 7/10, f = -1055.7082141445114
+Optimization restart 8/10, f = -1055.5997026447985
+Optimization restart 9/10, f = -1055.1228850470193
+Optimization restart 10/10, f = -1049.9301472204859
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137095694136
+Optimization restart 3/10, f = -1013.9137079834359
+Optimization restart 4/10, f = -1013.9129739768498
+Optimization restart 5/10, f = -1013.913703890363
+Optimization restart 6/10, f = -1013.9137061890499
+Optimization restart 7/10, f = -1013.91370834687
+Optimization restart 8/10, f = -1013.9137059826592
+Optimization restart 9/10, f = -1013.9137045044554
+Optimization restart 10/10, f = -1013.9137067850097
+Optimization restart 1/10, f = -1050.8419392052888
+Optimization restart 2/10, f = -1052.8371223307959
+Optimization restart 3/10, f = -1049.7665901327869
+Optimization restart 4/10, f = -1048.9526231699947
+Optimization restart 5/10, f = -1055.6023976482447
+Optimization restart 6/10, f = -1049.45598659371
+Optimization restart 7/10, f = -1037.764569128316
+Optimization restart 8/10, f = -1049.2110720521155
+Optimization restart 9/10, f = -1055.5826609905719
+Optimization restart 10/10, f = -1048.9393972852404
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9137056507664
+Optimization restart 3/10, f = -1013.9137019903833
+Optimization restart 4/10, f = -1013.9137051168659
+Optimization restart 5/10, f = -1013.9137072454521
+Optimization restart 6/10, f = -1013.9083490212195
+Optimization restart 7/10, f = -1013.912612991706
+Optimization restart 8/10, f = -1013.9137083873818
+Optimization restart 9/10, f = -1013.9137025948128
+Optimization restart 10/10, f = -1013.9137053267139
+Optimization restart 1/10, f = -1054.2248658117696
+Optimization restart 2/10, f = -1052.0094728043837
+Optimization restart 3/10, f = -1050.2887696210307
+Optimization restart 4/10, f = -1051.4150630240733
+Optimization restart 5/10, f = -1049.2567563200514
+Optimization restart 6/10, f = -1055.5175248452163
+Optimization restart 7/10, f = -1055.0816672879191
+Optimization restart 8/10, f = -1056.218074745609
+Optimization restart 9/10, f = -1056.1547405285528
+Optimization restart 10/10, f = -1050.44719383017
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9136781310137
+Optimization restart 3/10, f = -1013.9137075457475
+Optimization restart 4/10, f = -1013.9137059123968
+Optimization restart 5/10, f = -1013.9137022944592
+Optimization restart 6/10, f = -1013.9137091215282
+Optimization restart 7/10, f = -1013.9137066871069
+Optimization restart 8/10, f = -1013.9137079618972
+Optimization restart 9/10, f = -1013.911161170282
+Optimization restart 10/10, f = -1013.913707725553
+Optimization restart 1/10, f = -1051.862806388895
+Optimization restart 2/10, f = -1050.07303488456
+Optimization restart 3/10, f = -1056.4167341769817
+Optimization restart 4/10, f = -1048.17640098205
+Optimization restart 5/10, f = -1056.2526878369795
+Optimization restart 6/10, f = -1049.3607766989344
+Optimization restart 7/10, f = -1050.3471729062028
+Optimization restart 8/10, f = -1049.0082669488413
+Optimization restart 9/10, f = -1055.331008653726
+Optimization restart 10/10, f = -1056.1013647773352
+Optimization restart 1/10, f = -1013.9137062794182
+Optimization restart 2/10, f = -1013.9136979768448
+Optimization restart 3/10, f = -1013.9137081919787
+Optimization restart 4/10, f = -1013.9137035506346
+Optimization restart 5/10, f = -1013.9137058908298
+Optimization restart 6/10, f = -1013.9137021458707
+Optimization restart 7/10, f = -1013.9137014466996
+Optimization restart 8/10, f = -1013.9137057071516
+Optimization restart 9/10, f = -1013.9120451318756
+Optimization restart 10/10, f = -1013.9136333865347
+Optimization restart 1/10, f = -1050.4450201744248
+Optimization restart 2/10, f = -1055.580595938773
+Optimization restart 3/10, f = -1052.9459211982808
+Optimization restart 4/10, f = -1056.5481069151795
+Optimization restart 5/10, f = -1057.1018621070673
+Optimization restart 6/10, f = -1055.975454042607
+Optimization restart 7/10, f = -1049.8418161430463
+Optimization restart 8/10, f = -1056.909608567054
+Optimization restart 9/10, f = -1057.021400809731
+Optimization restart 10/10, f = -1049.664563109809
+  Completed 12 folds.          
+  Time: 309.2s (5.2 min)
+
+==================================================
+GP-Linear Results
+==================================================
+RMSE:  0.0148
+MAE:   0.0050
+R²:    1.0000
+NLL:   -4.3044
+Coverage (90%): 100.00%
+==================================================
+
+==================================================
+Running LOO-CV for DNN
+==================================================
+
+Running LOO-CV for Model (12 folds)...
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000244
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.008146
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.005957
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.014328
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000919
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000378
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.005793
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.007640
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.017303
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001135
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000336
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.007741
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.008497
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.016463
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001148
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000393
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.006871
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.004250
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.015475
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001144
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000249
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.006924
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.008046
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.015214
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000863
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000347
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.007737
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.006601
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.013335
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000852
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000334
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.008095
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.008713
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.015583
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001040
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000276
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.004896
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.006512
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.012595
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001106
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000399
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.007320
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.006946
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.018185
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001128
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000399
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.004096
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.005906
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.014767
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001172
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000357
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.007915
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.007340
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.013802
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000881
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000253
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.007364
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.006522
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.014397
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.001033
+  Completed 12 folds.          
+  Time: 387.4s (6.5 min)
+
+==================================================
+DNN Results
+==================================================
+RMSE:  5.2668
+MAE:   3.9223
+R²:    -0.4245
+NLL:   2.5879
+Coverage (90%): 83.33%
+==================================================
+
+==================================================
+Running LOO-CV for KAN
+==================================================
+
+Running LOO-CV for Model (12 folds)...
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000209
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000215
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000205
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000208
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000212
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000206
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000222
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000207
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000214
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000213
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000213
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000224
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000207
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000210
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000211
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000187
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000183
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000196
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000189
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000198
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000207
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000215
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000208
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000207
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000213
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000206
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000213
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000200
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000204
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000210
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000192
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000215
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000195
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000194
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000201
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000208
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000223
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000203
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000211
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000215
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000206
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000219
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000201
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000207
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000213
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000190
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000196
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000206
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000197
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000210
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000206
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000214
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000202
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000205
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000211
+
+--- Training ensemble member 1/5 ---
+  Member 1 final loss: 0.000201
+
+--- Training ensemble member 2/5 ---
+  Member 2 final loss: 0.000218
+
+--- Training ensemble member 3/5 ---
+  Member 3 final loss: 0.000198
+
+--- Training ensemble member 4/5 ---
+  Member 4 final loss: 0.000203
+
+--- Training ensemble member 5/5 ---
+  Member 5 final loss: 0.000206
+  Completed 12 folds.          
+  Time: 2654.2s (44.2 min)
+
+==================================================
+KAN Results
+==================================================
+RMSE:  4.0473
+MAE:   2.5651
+R²:    0.1588
+NLL:   29.0341
+Coverage (90%): 33.33%
+==================================================
+
+==================================================
+Running LOO-CV for Hybrid
+==================================================
+
+Running LOO-CV for Model (12 folds)...
+
+--- Training ensemble member 1/5 ---
+
+  !! Hybrid LOO-CV failed after 18.4s (0.3 min): in user code:
+
+    File "/Users/angadkumar16ak/Shukla/mf_comparision/models/mf_hybrid.py", line 94, in train_step  *
+        y_pred_hf_l = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
+
+    ValueError: Dimensions must be equal, but are 3 and 1 for '{{node MatMul_9}} = MatMul[T=DT_FLOAT, grad_a=false, grad_b=false, transpose_a=false, transpose_b=false](concat_6, MatMul_9/ReadVariableOp)' with input shapes: [11,3], [1,1].
+
+  [1/3] Forrester total: 3369.5s (56.2 min)
+
+[2/3] Real data (clean) — LOO-CV...
+Loading real data from /Users/angadkumar16ak/Shukla/mf_comparision/data/real/Data/Data.mat...
+
+Multi-Fidelity Dataset Summary:
+===============================
+Low-Fidelity:  653 points, 2D inputs
+High-Fidelity Train: 12 points
+High-Fidelity Test:  2 points
+
+Y_lf range:  [17.99, 23.35]
+Y_hf range:  [19.03, 21.27]
+
+
+==================================================
+Running LOO-CV for GP-Linear
+==================================================
+
+Running LOO-CV for Model (12 folds)...
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.8594754602293
+Optimization restart 3/10, f = -306.85947545981435
+Optimization restart 4/10, f = -306.8594754547841
+Optimization restart 5/10, f = -306.85947545532616
+Optimization restart 6/10, f = -306.8594754597364
+Optimization restart 7/10, f = -306.8594754602723
+Optimization restart 8/10, f = -306.8594754603889
+Optimization restart 9/10, f = -306.85947546009055
+Optimization restart 10/10, f = -306.8594754604367
+Optimization restart 1/10, f = -310.67702871307455
+Optimization restart 2/10, f = -310.6770303290159
+Optimization restart 3/10, f = -310.677029576559
+Optimization restart 4/10, f = -310.67703011410026
+Optimization restart 5/10, f = -310.6770293953028
+Optimization restart 6/10, f = -310.6770282898011
+Optimization restart 7/10, f = -310.67703059503026
+Optimization restart 8/10, f = -310.67702997730623
+Optimization restart 9/10, f = -310.67702956351764
+Optimization restart 10/10, f = -310.6770294118662
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.8594754604113
+Optimization restart 3/10, f = -306.8594754569813
+Optimization restart 4/10, f = -306.8594754603031
+Optimization restart 5/10, f = -306.85947545996635
+Optimization restart 6/10, f = -306.8594754604196
+Optimization restart 7/10, f = -306.85947545986403
+Optimization restart 8/10, f = -306.85947546011255
+Optimization restart 9/10, f = -306.8594753760075
+Optimization restart 10/10, f = -306.85947545821807
+Optimization restart 1/10, f = -309.82684483341495
+Optimization restart 2/10, f = -309.826844427817
+Optimization restart 3/10, f = -309.82684509623215
+Optimization restart 4/10, f = -309.8268450665703
+Optimization restart 5/10, f = -309.82684520629834
+Optimization restart 6/10, f = -309.82684442106125
+Optimization restart 7/10, f = -309.8268436007371
+Optimization restart 8/10, f = -309.82684513582325
+Optimization restart 9/10, f = -309.8268453398139
+Optimization restart 10/10, f = -309.82684556185177
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.85947546033213
+Optimization restart 3/10, f = -306.85947546035135
+Optimization restart 4/10, f = -185.48321250039243
+Optimization restart 5/10, f = -306.85947546047424
+Optimization restart 6/10, f = -306.8594754604677
+Optimization restart 7/10, f = -306.8594754604263
+Optimization restart 8/10, f = -306.8594754604732
+Optimization restart 9/10, f = -306.8594754604476
+Optimization restart 10/10, f = -306.8594754587536
+Optimization restart 1/10, f = -309.45456920566886
+Optimization restart 2/10, f = -309.4545692868009
+Optimization restart 3/10, f = -309.4545688112616
+Optimization restart 4/10, f = -309.45455878529015
+Optimization restart 5/10, f = -309.4545667953309
+Optimization restart 6/10, f = -309.45456930935626
+Optimization restart 7/10, f = -309.45456840886897
+Optimization restart 8/10, f = -309.4545656492512
+Optimization restart 9/10, f = -309.4545691251353
+Optimization restart 10/10, f = -309.4545692107289
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.85947546014046
+Optimization restart 3/10, f = -306.85947546042564
+Optimization restart 4/10, f = -306.8594754604704
+Optimization restart 5/10, f = -306.85947546008924
+Optimization restart 6/10, f = -306.8594754602832
+Optimization restart 7/10, f = -306.8594754603362
+Optimization restart 8/10, f = -306.85947546046657
+Optimization restart 9/10, f = -306.85947546041314
+Optimization restart 10/10, f = -306.8594754594184
+Optimization restart 1/10, f = -309.4108362515269
+Optimization restart 2/10, f = -309.4108355339044
+Optimization restart 3/10, f = -309.41083555146287
+Optimization restart 4/10, f = -309.4108353862778
+Optimization restart 5/10, f = -309.41082411585
+Optimization restart 6/10, f = -309.4108356634471
+Optimization restart 7/10, f = -309.4108263193464
+Optimization restart 8/10, f = -309.41083583678017
+Optimization restart 9/10, f = -309.4108357339776
+Optimization restart 10/10, f = -309.41083611336927
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.85947546046873
+Optimization restart 3/10, f = -306.85947545795653
+Optimization restart 4/10, f = -306.85947545979604
+Optimization restart 5/10, f = -251.02718968184865
+Optimization restart 6/10, f = -306.8594754523335
+Optimization restart 7/10, f = -306.85947546023357
+Optimization restart 8/10, f = -306.8594754603932
+Optimization restart 9/10, f = -306.85947545865037
+Optimization restart 10/10, f = -306.8594754585466
+Optimization restart 1/10, f = -309.98040925659234
+Optimization restart 2/10, f = -309.98040931737825
+Optimization restart 3/10, f = -309.98040919587197
+Optimization restart 4/10, f = -311.1196925262901
+Optimization restart 5/10, f = -309.98040945821253
+Optimization restart 6/10, f = -309.98040997815883
+Optimization restart 7/10, f = -309.9804079821683
+Optimization restart 8/10, f = -309.98040843929107
+Optimization restart 9/10, f = -309.98040715116696
+Optimization restart 10/10, f = -309.98040859130435
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.8594754591531
+Optimization restart 3/10, f = -306.8594754604723
+Optimization restart 4/10, f = -306.8594754377001
+Optimization restart 5/10, f = -306.8594754597494
+Optimization restart 6/10, f = -306.859475282067
+Optimization restart 7/10, f = -306.8594754602815
+Optimization restart 8/10, f = -306.85947546044594
+Optimization restart 9/10, f = -306.8594754589283
+Optimization restart 10/10, f = -306.85947546047834
+Optimization restart 1/10, f = -309.17773572404724
+Optimization restart 2/10, f = -309.1777522963079
+Optimization restart 3/10, f = -309.177750011003
+Optimization restart 4/10, f = -309.17774975736495
+Optimization restart 5/10, f = -309.1777537889808
+Optimization restart 6/10, f = -309.1777539017414
+Optimization restart 7/10, f = -309.17775364096207
+Optimization restart 8/10, f = -309.17775360912754
+Optimization restart 9/10, f = -309.17775096931587
+Optimization restart 10/10, f = -309.17775325403244
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.85947545928
+Optimization restart 3/10, f = -306.8594754604718
+Optimization restart 4/10, f = -306.859475459662
+Optimization restart 5/10, f = -306.8594754598186
+Optimization restart 6/10, f = -306.8594754604669
+Optimization restart 7/10, f = -306.859475458113
+Optimization restart 8/10, f = -306.85947544410726
+Optimization restart 9/10, f = -306.8594754582051
+Optimization restart 10/10, f = -306.8594754602831
+Optimization restart 1/10, f = -309.29559874606355
+Optimization restart 2/10, f = -309.2955992224282
+Optimization restart 3/10, f = -309.29559783568897
+Optimization restart 4/10, f = -309.29559847339823
+Optimization restart 5/10, f = -309.29559993761825
+Optimization restart 6/10, f = -309.29559933078133
+Optimization restart 7/10, f = -309.2955999991491
+Optimization restart 8/10, f = -309.29559816200486
+Optimization restart 9/10, f = -309.29559994405844
+Optimization restart 10/10, f = -309.2955999787664
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.8594754575445
+Optimization restart 3/10, f = -306.8594754573677
+Optimization restart 4/10, f = -306.85947546037943
+Optimization restart 5/10, f = -306.85947546021777
+Optimization restart 6/10, f = -306.8594754553037
+Optimization restart 7/10, f = -306.85947546043514
+Optimization restart 8/10, f = -306.8594754603666
+Optimization restart 9/10, f = -306.85947546021157
+Optimization restart 10/10, f = -306.85947545982316
+Optimization restart 1/10, f = -313.1412131279132
+Optimization restart 2/10, f = -313.1411882520106
+Optimization restart 3/10, f = -313.1412042939924
+Optimization restart 4/10, f = -313.14114501377856
+Optimization restart 5/10, f = -313.14117670233736
+Optimization restart 6/10, f = -313.1411471041366
+Optimization restart 7/10, f = -313.1411946421842
+Optimization restart 8/10, f = -313.14119344768426
+Optimization restart 9/10, f = -313.13961394130536
+Optimization restart 10/10, f = -313.141188623893
+Optimization restart 1/10, f = -306.8594754604609
+Optimization restart 2/10, f = -306.85947545908687
+Optimization restart 3/10, f = -306.8594754234755
+Optimization restart 4/10, f = -306.8594754592525
+Optimization restart 5/10, f = -306.8594754604661
+Optimization restart 6/10, f = -207.1941707404793
+Optimization restart 7/10, f = -306.859475460333
+Optimization restart 8/10, f = -306.8594754602116
+Optimization restart 9/10, f = -306.859475460431
+Optimization restart 10/10, f = -306.8594754594079
+Optimization restart 1/10, f = -309.2804342999125
+Optimization restart 2/10, f = -309.280429161794
+Optimization restart 3/10, f = -309.2804342130097
+Optimization restart 4/10, f = -309.28043423925044
+Optimization restart 5/10, f = -309.28043417314973
+Optimization restart 6/10, f = -309.28043431244305
+Optimization restart 7/10, f = -309.28037088282076
+Optimization restart 8/10, f = -309.2804322901187
+Optimization restart 9/10, f = -309.28043354403786
+Optimization restart 10/10, f = -309.2804342856899
+Optimization restart 1/10, f = -306.8594754604609

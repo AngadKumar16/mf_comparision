@@ -510,10 +510,20 @@ if __name__ == "__main__":
     Y_hf = (np.sin(2 * np.pi * X_hf[:, 0:1]) + 0.5 * X_hf[:, 1:2]).astype(np.float32)
 
     model = MFKAN(max_epochs=5000, patience=1000, verbose=True)
+
+    t_fit_start = time.time()
     info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
+    fit_elapsed = time.time() - t_fit_start
+
     print(f"Final loss: {info['final_loss']:.6f}, Epochs: {info['epochs_trained']}")
+    print(f"Fit time: {fit_elapsed:.2f}s ({info['epochs_trained']/fit_elapsed:.1f} epochs/sec)")
 
     X_test = np.random.rand(5, 2).astype(np.float32)
+
+    t_pred_start = time.time()
     y_pred, _ = model.predict(X_test)
+    pred_elapsed = time.time() - t_pred_start
+
     print(f"Predictions: {y_pred.flatten()}")
+    print(f"Predict time: {pred_elapsed*1000:.2f}ms")
     print("✓ MF-KAN test passed!")
