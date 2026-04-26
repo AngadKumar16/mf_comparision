@@ -121,7 +121,7 @@ class MFHybridTrainer(tf.Module):
         with tf.GradientTape() as tape:
             y_pred_lf = self.kan_lf(x_lf)
             loss_lf = (tf.reduce_mean(tf.square(y_pred_lf - y_lf))
-                       + self.kan_lf.regularization_loss(0.001))
+                       + self.kan_lf.regularization_loss(0.05))
         grads = tape.gradient(loss_lf, lf_vars)
         self.lf_optimizer.apply_gradients(zip(grads, lf_vars))
         return loss_lf
