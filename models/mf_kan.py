@@ -291,7 +291,7 @@ class MFKANTrainer(tf.Module):
             # Losses — drop loss_lf and reg_lf since LF is frozen
             loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
             loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))  # monitor only
-            reg_hf  = self.kan_hf_nl.regularization_loss(0.001)
+            reg_hf  = self.kan_hf_nl.regularization_loss(0.05)
             loss    = loss_hf + reg_hf
 
         hf_vars = self.kan_hf_nl.trainable_variables + [self.W_hf_l, self.b_hf_l]
