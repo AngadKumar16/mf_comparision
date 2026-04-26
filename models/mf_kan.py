@@ -273,8 +273,6 @@ class MFKANTrainer(tf.Module):
         x_combined = tf.concat([x_lf, x_hf_coords], axis=0)
 
         with tf.GradientTape() as tape:
-            y_combined = self.kan_lf(x_combined)
-
             # LF predictions — used as features but NOT optimized through
             y_combined = self.kan_lf(x_combined)
             y_pred_lf  = y_combined[:n_lf]
