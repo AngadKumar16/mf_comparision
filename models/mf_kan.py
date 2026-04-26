@@ -155,10 +155,9 @@ class KANLayer(tf.Module):
         
         # Combine basis with coefficients
         # basis: (batch, in, num_basis), spline_weight: (in, out, num_basis)
-        spline_output = tf.einsum('bin,ion->bo', basis, self.spline_weight)
-        
-        # Apply learnable scale
-        spline_output = spline_output * tf.reduce_mean(self.spline_scale)
+        scaled_weight = self.spline_weight * tf.expand_dims(self.spline_scale, -1)
+        spline_output = tf.einsum('bin,ion->bo', basis, scaled_weight)
+
         
         return base_output + spline_output
     
@@ -264,18 +263,26 @@ class MFKANTrainer(tf.Module):
     @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
                 x_hf_coords: tf.Tensor, y_hf: tf.Tensor,
-                n_lf: int):   # pass as Python int, not tf.shape
-        
+                n_lf: int):
+        """
+        Phase 2 trains HF networks only — LF is frozen (Meng & Karniadakis 2020).
+        LF predictions feed forward into HF augmentation but gradients are blocked
+        via tf.stop_gradient, preventing HF loss from distorting the LF surface.
+        """
+        # Only HF variables receive gradient updates in Phase 2
         x_combined = tf.concat([x_lf, x_hf_coords], axis=0)
 
-
         with tf.GradientTape() as tape:
-            # Single kan_lf forward pass instead of two
+            y_combined = self.kan_lf(x_combined)
+
+            # LF predictions — used as features but NOT optimized through
             y_combined = self.kan_lf(x_combined)
             y_pred_lf  = y_combined[:n_lf]
             y_lf_at_hf = y_combined[n_lf:]
+            # Block gradients into LF network
+            y_lf_at_hf = tf.stop_gradient(y_lf_at_hf)
 
-            # Augment HF coordinates
+            # Augment HF coordinates with frozen LF predictions
             x_aug = tf.concat([x_hf_coords, y_lf_at_hf], axis=1)
 
             # HF predictions
@@ -283,15 +290,16 @@ class MFKANTrainer(tf.Module):
             y_pred_hf_l  = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
             y_pred_hf    = y_pred_hf_l + y_pred_hf_nl
 
-            # Losses
-            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+            # Losses — drop loss_lf and reg_lf since LF is frozen
             loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
-            reg_lf  = self.kan_lf.regularization_loss(0.001)
+            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))  # monitor only
             reg_hf  = self.kan_hf_nl.regularization_loss(0.001)
-            loss    = loss_lf + loss_hf + reg_lf + reg_hf
+            loss    = loss_hf + reg_hf
 
-        grads = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+        hf_vars = self.kan_hf_nl.trainable_variables + [self.W_hf_l, self.b_hf_l]
+        grads = tape.gradient(loss, hf_vars)
+        self.optimizer.apply_gradients(zip(grads, hf_vars))
+
 
         return loss, loss_lf, loss_hf
 
@@ -527,3 +535,15 @@ if __name__ == "__main__":
     print(f"Predictions: {y_pred.flatten()}")
     print(f"Predict time: {pred_elapsed*1000:.2f}ms")
     print("✓ MF-KAN test passed!")
+    print("\n--- Testing seed variance ---")
+    losses = []
+    for seed in [42, 142, 242]:
+        np.random.seed(seed)
+        tf.random.set_seed(seed)
+        model = MFKAN(max_epochs=2000, patience=500, verbose=False)
+        info = model.fit(X_lf, Y_lf, X_hf, Y_hf)
+        losses.append(info['final_loss'])
+        print(f"  Seed {seed}: final loss = {info['final_loss']:.6e}")
+
+    print(f"  Spread (max/min): {max(losses)/min(losses):.2f}x")
+    print(f"  >>> Expect > 2x if spline_scale fix worked. ~1x means still broken.")
