@@ -73,7 +73,7 @@ HYBRID_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
     'layers_hf_nl': [3, 10, 10, 1],
     'layers_hf_l': [3, 1],
-    'grid_size': 5,
+    'grid_size': 3,
     'spline_order': 3,
     'learning_rate': 0.001,
     'l2_reg': 0.01,
