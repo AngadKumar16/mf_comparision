@@ -76,17 +76,26 @@ class MFHybridTrainer(tf.Module):
 
     @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
-                   x_hf_coords: tf.Tensor, y_hf: tf.Tensor
-                   ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        """Single training step. All inputs pre-normalized to [-1, 1]."""
+                x_hf_coords: tf.Tensor, y_hf: tf.Tensor
+                ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """
+        Phase 2 trains HF networks only — LF KAN is frozen (Meng & Karniadakis 2020).
+        LF predictions feed forward into HF augmentation but gradients are blocked
+        via tf.stop_gradient, preventing HF loss from distorting the LF surface.
+        """
+        # Only HF variables receive gradient updates in Phase 2
+        hf_vars = self.W_hf_nl + self.b_hf_nl + [self.W_hf_l, self.b_hf_l]
+
         with tf.GradientTape() as tape:
-            # LF prediction at LF locations
+            tape.watch(hf_vars)
+
+            # LF predictions — used as features but NOT optimized through
             y_pred_lf = self.kan_lf(x_lf)
-
-            # LF prediction at HF coordinates (for augmentation)
             y_lf_at_hf = self.kan_lf(x_hf_coords)
+            # Block gradients into LF KAN
+            y_lf_at_hf = tf.stop_gradient(y_lf_at_hf)
 
-            # Augment HF coordinates with LF predictions
+            # Augment HF coordinates with frozen LF predictions
             x_aug = tf.concat([x_hf_coords, y_lf_at_hf], axis=1)
 
             # HF predictions: DNN nonlinear + linear
@@ -94,16 +103,16 @@ class MFHybridTrainer(tf.Module):
             y_pred_hf_l = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
             y_pred_hf = y_pred_hf_nl + y_pred_hf_l
 
-            # Losses
-            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
+            # Losses — drop loss_lf and reg_kan since LF is frozen
             loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
-            reg_kan = self.kan_lf.regularization_loss(0.001)
+            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))  # monitor only
             reg_dnn = self.l2_reg * tf.add_n([tf.nn.l2_loss(w) for w in self.W_hf_nl])
-            loss = loss_lf + loss_hf + reg_kan + reg_dnn
+            loss = loss_hf + reg_dnn
 
-        grads = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+        grads = tape.gradient(loss, hf_vars)
+        self.optimizer.apply_gradients(zip(grads, hf_vars))
         return loss, loss_lf, loss_hf
+
 
     @tf.function
     def pretrain_step_lf(self, x_lf: tf.Tensor, y_lf: tf.Tensor) -> tf.Tensor:
