@@ -113,30 +113,28 @@ class MFTrainer(tf.Module):
 
     @tf.function
     def train_step(self, x_lf: tf.Tensor, y_lf: tf.Tensor,
-                   x_hf_coords: tf.Tensor, y_hf: tf.Tensor
-                   ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+                x_hf_coords: tf.Tensor, y_hf: tf.Tensor
+                ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         """
         Single training step. All inputs pre-normalized to [-1, 1].
 
-        Args:
-            x_lf: LF input coordinates (pre-normalized)
-            y_lf: LF targets (pre-normalized)
-            x_hf_coords: HF input coordinates (pre-normalized, 2D)
-            y_hf: HF targets (pre-normalized)
-
-        Returns:
-            total_loss, loss_lf, loss_hf
+        Phase 2 trains HF networks only — LF is frozen (Meng & Karniadakis 2020).
+        LF predictions feed forward into HF augmentation but gradients are blocked
+        via tf.stop_gradient, preventing HF loss from distorting the LF surface.
         """
+        # Only HF variables receive gradient updates in Phase 2
+        hf_vars = self.W_hf_nl + self.b_hf_nl + self.W_hf_l + self.b_hf_l
+
         with tf.GradientTape() as tape:
-            tape.watch(self.trainable_vars)
+            tape.watch(hf_vars)
 
-            # LF prediction at LF locations
+            # LF predictions — used as features but NOT optimized through
             y_pred_lf = self.dnn.fnn(self.W_lf, self.b_lf, x_lf)
-
-            # LF prediction at HF coordinates (for augmentation)
             y_lf_at_hf = self.dnn.fnn(self.W_lf, self.b_lf, x_hf_coords)
+            # Block gradients into LF network
+            y_lf_at_hf = tf.stop_gradient(y_lf_at_hf)
 
-            # Augment HF coordinates with LF predictions → 3D
+            # Augment HF coordinates with frozen LF predictions
             x_aug = tf.concat([x_hf_coords, y_lf_at_hf], axis=1)
 
             # HF predictions (nonlinear + linear)
@@ -144,17 +142,16 @@ class MFTrainer(tf.Module):
             y_pred_hf_l = self.dnn.fnn(self.W_hf_l, self.b_hf_l, x_aug)
             y_pred_hf = y_pred_hf_l + y_pred_hf_nl
 
-            # Losses
+            # Losses — drop loss_lf from total since LF is frozen
             loss_l2 = self.l2_reg * tf.add_n([tf.nn.l2_loss(w) for w in self.W_hf_nl])
-            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))
             loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
-            loss = loss_lf + loss_hf + loss_l2
+            loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))  # monitor only
+            loss = loss_hf + loss_l2
 
-        grads = tape.gradient(loss, self.trainable_vars)
-        self.optimizer.apply_gradients(zip(grads, self.trainable_vars))
+        grads = tape.gradient(loss, hf_vars)
+        self.optimizer.apply_gradients(zip(grads, hf_vars))
 
         return loss, loss_lf, loss_hf
-
     def predict(self, x_coords: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """
         Predict LF and HF outputs. Inputs pre-normalized; outputs in normalized space.
