@@ -154,13 +154,17 @@ class MFGP_Linear:
         self.lf_gp.fit(X_lf, Y_lf)
         
         # =====================================================
-        # Step 2: Compute LF→HF scaling (for reference only)
+        # Step 2: Compute LF→HF scaling
         # =====================================================
         if compute_lf_scaling:
             Y_lf_at_hf, _ = self.lf_gp.predict(X_hf, return_std=False)
             self.rho, self.bias = np.polyfit(Y_lf_at_hf.flatten(), Y_hf.flatten(), 1)
+            # Apply calibration to ALL LF predictions
+            Y_lf_pred_full, _ = self.lf_gp.predict(X_lf, return_std=False)
+            Y_lf_calibrated = self.rho * Y_lf_pred_full + self.bias
         else:
             self.rho, self.bias = 1.0, 0.0
+            Y_lf_calibrated = Y_lf
 
         # =====================================================
         # Step 3: Build MF training data
@@ -168,7 +172,7 @@ class MFGP_Linear:
         # Combine LF and HF data with fidelity indicators.
         # Pass raw Y_lf (no pre-scaling): GPyLinearMultiFidelityModel
         # learns its own rho internally.
-        Y_train = np.vstack([Y_lf, Y_hf])
+        Y_train = np.vstack([Y_lf_calibrated, Y_hf])
         X_train = np.vstack([X_lf, X_hf])
         
         # Fidelity column: 0 = LF, 1 = HF
