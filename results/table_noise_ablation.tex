@@ -1,0 +1,16 @@
+% Requires \usepackage{booktabs} in your LaTeX preamble
+\begin{table}[ht]
+\caption{Noise ablation study: RMSE (mean $\pm$ std) at each noise level.}
+\label{tab:noise_ablation}
+\begin{tabular}{lrrrrr}
+\toprule
+ & 0\% & 5\% & 10\% & 15\% & 20\% \\
+Model &  &  &  &  &  \\
+\midrule
+GP-Linear & 0.3198 $\pm$ 0.0036 & 0.3151 $\pm$ 0.0286 & 0.3158 $\pm$ 0.0458 & 0.3122 $\pm$ 0.0616 & 0.2987 $\pm$ 0.0723 \\
+DNN & 0.6783 $\pm$ 0.1383 & 0.6035 $\pm$ 0.0956 & 0.8242 $\pm$ 0.0496 & 0.6578 $\pm$ 0.1277 & 0.6493 $\pm$ 0.1257 \\
+KAN & 0.5158 $\pm$ 0.1695 & 0.5739 $\pm$ 0.2660 & 0.4553 $\pm$ 0.2656 & 0.6407 $\pm$ 0.2554 & 0.4058 $\pm$ 0.1889 \\
+Hybrid & 0.4911 $\pm$ 0.0698 & 0.5149 $\pm$ 0.1000 & 0.4825 $\pm$ 0.0701 & 0.5867 $\pm$ 0.1369 & 0.5470 $\pm$ 0.0578 \\
+\bottomrule
+\end{tabular}
+\end{table}

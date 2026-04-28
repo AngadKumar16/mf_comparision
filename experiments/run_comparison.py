@@ -35,11 +35,19 @@ from utils.data_utils import NormalizingModelWrapper
 
 
 def load_data(use_synthetic: bool = False):
-    """Load data from MATLAB file or generate synthetic."""
+    """Load data from MATLAB file or generate synthetic.
+    Both paths return identical 12/2 train/test splits."""
     if use_synthetic:
         print("Using synthetic Forrester data...")
         from data.synthetic.forrester import Forrester2D
-        data = Forrester2D.generate_data()
+        data = Forrester2D.generate_data(n_lf=200, n_hf_train=14)
+        # Split 12 train / 2 test to match AGU 2025 protocol on real data
+        X_hf_full = data['X_hf_train']
+        Y_hf_full = data['Y_hf_train']
+        data['X_hf_train'] = X_hf_full[:12]
+        data['Y_hf_train'] = Y_hf_full[:12]
+        data['X_hf_test']  = X_hf_full[12:14]
+        data['Y_hf_test']  = Y_hf_full[12:14]
         return data
     else:
         print(f"Loading real data from {MATLAB_DATA_PATH}...")
@@ -117,14 +125,16 @@ def create_model_factories():
 
 def run_loo_comparison(data: dict, model_factories: dict,
                        verbose: bool = True, ensemble_nn: bool = True):
-    """Run LOO-CV for all models and compare.
+    """Train on 12 HF points, evaluate on 2 held-out test points.
+    Matches AGU 2025 evaluation protocol (Kumar & Shukla, 2025).
 
     Args:
-        ensemble_nn: Wrap DNN/KAN with DeepEnsemble(n=3) so they produce
-                     meaningful NLL/Coverage alongside GP-Linear and Hybrid.
+        ensemble_nn: Wrap DNN/KAN/Hybrid with DeepEnsemble(n=5) so they
+                     produce meaningful NLL/Coverage alongside GP-Linear.
     """
-    from experiments.loo_cv import run_loo_cv
-    from utils.metrics import print_metrics_summary
+    from utils.metrics import (compute_regression_metrics,
+                                compute_uncertainty_metrics,
+                                print_metrics_summary)
     from uncertainty.ensemble import DeepEnsemble
 
     results = {}
@@ -132,30 +142,40 @@ def run_loo_comparison(data: dict, model_factories: dict,
     for name, factory in model_factories.items():
         if verbose:
             print(f"\n{'='*50}")
-            print(f"Running LOO-CV for {name}")
+            print(f"Running 12/2 holdout for {name}")
             print('='*50)
 
         effective_factory = factory
         if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
-            effective_factory = lambda f=factory: DeepEnsemble(
-                f, n_models=5
-            )
+            effective_factory = lambda f=factory: DeepEnsemble(f, n_models=5)
 
         t_start = time.time()
         try:
-            metrics = run_loo_cv(
-                model_factory=effective_factory,
-                X_lf=data['X_lf'],
-                Y_lf=data['Y_lf'],
-                X_hf=data['X_hf_train'],
-                Y_hf=data['Y_hf_train'],
-                verbose=verbose
-            )
+            model = NormalizingModelWrapper(effective_factory())
+            model.fit(data['X_lf'], data['Y_lf'],
+                      data['X_hf_train'], data['Y_hf_train'])
+
+            y_pred, y_std = model.predict(data['X_hf_test'], return_std=True)
+            if y_std is None:
+                y_std = np.zeros_like(y_pred)
+
+            y_true = np.asarray(data['Y_hf_test']).flatten()
+            y_pred_flat = y_pred.flatten()
+            y_std_flat = y_std.flatten()
+
+            reg = compute_regression_metrics(y_true, y_pred_flat)
+            unc = compute_uncertainty_metrics(y_true, y_pred_flat, y_std_flat)
+            metrics = {
+                'y_true': y_true, 'y_pred': y_pred_flat, 'y_std': y_std_flat,
+                'n_folds': len(y_true),
+                **reg, **unc,
+            }
+
             elapsed = time.time() - t_start
             print(f"  Time: {elapsed:.1f}s ({elapsed/60:.1f} min)")
         except Exception as e:
             elapsed = time.time() - t_start
-            print(f"\n  !! {name} LOO-CV failed after {elapsed:.1f}s ({elapsed/60:.1f} min): {e}")
+            print(f"\n  !! {name} holdout failed after {elapsed:.1f}s ({elapsed/60:.1f} min): {e}")
             import traceback
             traceback.print_exc()
             results[name] = None
@@ -167,6 +187,7 @@ def run_loo_comparison(data: dict, model_factories: dict,
             print_metrics_summary(metrics, name)
 
     return results
+
 
 
 def run_noise_ablation(data: dict, model_factories: dict, 
