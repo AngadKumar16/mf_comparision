@@ -65,6 +65,7 @@ class MFHybridTrainer(tf.Module):
         self.l2_reg = l2_reg
         self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
         self.lf_optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
+        self.sf = False
 
     @property
     def trainable_variables(self) -> List[tf.Variable]:
@@ -94,6 +95,9 @@ class MFHybridTrainer(tf.Module):
             y_lf_at_hf = self.kan_lf(x_hf_coords)
             # Block gradients into LF KAN
             y_lf_at_hf = tf.stop_gradient(y_lf_at_hf)
+            if self.sf:
+                y_lf_at_hf = tf.zeros_like(y_lf_at_hf)
+
 
             # Augment HF coordinates with frozen LF predictions
             x_aug = tf.concat([x_hf_coords, y_lf_at_hf], axis=1)
@@ -129,7 +133,8 @@ class MFHybridTrainer(tf.Module):
     def predict(self, x_coords: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """Predict LF and HF. Inputs pre-normalized; outputs in normalized space."""
         y_pred_lf = self.kan_lf(x_coords)
-        x_aug = tf.concat([x_coords, y_pred_lf], axis=1)
+        lf_feat = tf.zeros_like(y_pred_lf) if self.sf else y_pred_lf
+        x_aug = tf.concat([x_coords, lf_feat], axis=1)
         y_pred_hf_nl = self.dnn.fnn(self.W_hf_nl, self.b_hf_nl, x_aug)
         y_pred_hf_l = tf.matmul(x_aug, self.W_hf_l) + self.b_hf_l
         y_pred_hf = y_pred_hf_nl + y_pred_hf_l
@@ -159,6 +164,7 @@ class HybridKANDNN:
                  patience: int = 1000,
                  l2_reg: float = 0.01,
                  lf_pretrain_patience: int = 500,
+                 sf: bool = False,
                  verbose: bool = True):
         self.name = "Hybrid-KAN-DNN"
         self.layers_lf = layers_lf or [2, 20, 20, 1]
@@ -171,6 +177,7 @@ class HybridKANDNN:
         self.patience = patience
         self.l2_reg = l2_reg
         self.lf_pretrain_patience = lf_pretrain_patience
+        self.sf = sf
         self.verbose = verbose
 
         self.trainer = None
@@ -200,6 +207,7 @@ class HybridKANDNN:
             grid_size=self.grid_size, spline_order=self.spline_order,
             learning_rate=self.learning_rate, l2_reg=self.l2_reg
         )
+        self.trainer.sf = self.sf
 
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=self.learning_rate,
@@ -215,7 +223,7 @@ class HybridKANDNN:
         y_hf_t = tf.convert_to_tensor(Y_hf, dtype=tf.float32)
 
         # ── Phase 1: LF KAN Pretraining ──────────────────────────────────
-        if self.lf_pretrain_patience > 0:
+        if self.lf_pretrain_patience > 0 and not self.sf:
             best_lf = float('inf')
             wait_lf = 0
             best_lf_weights = None
