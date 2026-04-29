@@ -422,7 +422,7 @@ class MFKAN:
                 else:
                     wait_lf += 1
                     if wait_lf >= self.lf_pretrain_patience:
-                        if self.verbose and epoch % 5000 == 0:
+                        if self.verbose:
                             print(f"Epoch {epoch}: loss={val:.6f} | time={time.strftime('%H:%M:%S')}")
                         break
             if best_lf_weights is not None:
