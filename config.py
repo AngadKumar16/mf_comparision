@@ -46,19 +46,19 @@ JOINT_PATIENCE = 2000       # Phase 2: stop joint training after no improvement
 # Deep Neural Network
 DNN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 10, 10, 1],
+    'layers_hf_nl': [3, 6, 6, 1],
     'layers_hf_l': [3, 1],
     'learning_rate': 0.001,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
-    'l2_reg': 0.01,
+    'l2_reg': 0.03,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
 
 # Kolmogorov-Arnold Network
 KAN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 10, 10, 1],
+    'layers_hf_nl': [3, 6, 6, 1],
     'layers_hf_l': [3, 1],
     'grid_size': 3,
     'spline_order': 3,
@@ -71,12 +71,12 @@ KAN_CONFIG = {
 # Hybrid KAN+DNN (NOVELTY)
 HYBRID_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 10, 10, 1],
+    'layers_hf_nl': [3, 6, 6, 1],
     'layers_hf_l': [3, 1],
     'grid_size': 3,
     'spline_order': 3,
     'learning_rate': 0.001,
-    'l2_reg': 0.01,
+    'l2_reg': 0.03,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
