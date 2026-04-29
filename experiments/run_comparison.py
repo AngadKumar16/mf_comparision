@@ -144,8 +144,8 @@ def run_loo_comparison(data: dict, model_factories: dict,
                      meaningful uncertainty alongside GP-Linear.
     """
 
-    X_hf = np.asarray(data['X_hf_train'])
-    Y_hf = np.asarray(data['Y_hf_train']).reshape(-1, 1)
+    X_hf = np.vstack([np.asarray(data['X_hf_train']), np.asarray(data['X_hf_test'])])
+    Y_hf = np.vstack([np.asarray(data['Y_hf_train']).reshape(-1, 1), np.asarray(data['Y_hf_test']).reshape(-1, 1)])
     n = len(X_hf)
 
     results = {}
