@@ -120,7 +120,6 @@ class MFGP_Linear:
         self.is_trained = False
         
         # Store scaling parameters
-        self.rho = None
         self.bias = None
     
     def fit(self, X_lf, Y_lf, X_hf, Y_hf, **kwargs):
