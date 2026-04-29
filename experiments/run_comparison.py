@@ -129,7 +129,7 @@ def create_model_factories():
     return factories
 
 
-def run_loo_cv(data: dict, model_factories: dict,
+def run_loo_comparison(data: dict, model_factories: dict,
                verbose: bool = True, ensemble_nn: bool = True):
     """True leave-one-out CV across HF training points.
 
