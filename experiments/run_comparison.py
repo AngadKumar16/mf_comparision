@@ -18,18 +18,10 @@ import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 import numpy as np
 import warnings
-from sklearn.model_selection import LeaveOneOut
-from utils.metrics import (compute_regression_metrics,
-                                compute_uncertainty_metrics,
-                                print_metrics_summary)
-from uncertainty.ensemble import DeepEnsemble
-import time
 
-warnings.filterwarnings('ignore')
-
-# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sklearn.model_selection import LeaveOneOut
 from config import (
     MATLAB_DATA_PATH, N_HF_TRAIN, RANDOM_SEED,
     GP_CONFIG, DNN_CONFIG, KAN_CONFIG, HYBRID_CONFIG,
@@ -37,6 +29,15 @@ from config import (
     RESULTS_DIR, FIGURES_DIR
 )
 from utils.data_utils import NormalizingModelWrapper
+from utils.metrics import (compute_regression_metrics,
+                           compute_uncertainty_metrics,
+                           print_metrics_summary)
+from uncertainty.ensemble import DeepEnsemble
+
+import time
+
+warnings.filterwarnings('ignore')
+
 
 
 def load_data(use_synthetic: bool = False):
