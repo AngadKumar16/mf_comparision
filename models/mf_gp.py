@@ -123,104 +123,58 @@ class MFGP_Linear:
         self.rho = None
         self.bias = None
     
-    def fit(self, X_lf: np.ndarray, Y_lf: np.ndarray,
-            X_hf: np.ndarray, Y_hf: np.ndarray,
-            compute_lf_scaling: bool = True) -> Dict[str, Any]:
-        """
-        Train linear MF-GP.
-        
-        Args:
-            X_lf: LF input locations (N_L, D)
-            Y_lf: LF output values (N_L, 1)
-            X_hf: HF input locations (N_H, D)
-            Y_hf: HF output values (N_H, 1)
-            compute_lf_scaling: Whether to compute linear LF→HF scaling
-        
-        Returns:
-            Training info dict
-        """
-        # Ensure correct shapes and types
+    def fit(self, X_lf, Y_lf, X_hf, Y_hf, **kwargs):
+        """Train linear MF-GP."""
         X_lf = np.asarray(X_lf, dtype=np.float64)
         Y_lf = np.asarray(Y_lf, dtype=np.float64).reshape(-1, 1)
         X_hf = np.asarray(X_hf, dtype=np.float64)
         Y_hf = np.asarray(Y_hf, dtype=np.float64).reshape(-1, 1)
-        
+
         input_dim = X_lf.shape[1]
-        
-        # =====================================================
-        # Step 1: Train LF GP (for later predictions)
-        # =====================================================
+
+        # Step 1: Train standalone LF GP for predict_lf() and diagnostics
         self.lf_gp = SingleFidelityGP(num_restarts=self.num_restarts)
         self.lf_gp.fit(X_lf, Y_lf)
-        
-        # =====================================================
-        # Step 2: Compute LF→HF scaling
-        # =====================================================
-        if compute_lf_scaling:
-            Y_lf_at_hf, _ = self.lf_gp.predict(X_hf, return_std=False)
-            self.rho, self.bias = np.polyfit(Y_lf_at_hf.flatten(), Y_hf.flatten(), 1)
-            # Apply calibration to ALL LF predictions
-            Y_lf_pred_full, _ = self.lf_gp.predict(X_lf, return_std=False)
-            Y_lf_calibrated = self.rho * Y_lf_pred_full + self.bias
-        else:
-            self.rho, self.bias = 1.0, 0.0
-            Y_lf_calibrated = Y_lf
 
-        # =====================================================
-        # Step 3: Build MF training data
-        # =====================================================
-        # Combine LF and HF data with fidelity indicators.
-        # Pass raw Y_lf (no pre-scaling): GPyLinearMultiFidelityModel
-        # learns its own rho internally.
-        Y_train = np.vstack([Y_lf_calibrated, Y_hf])
+        # Step 2: Build MF training data — pass raw Y_lf, kernel learns rho
+        Y_train = np.vstack([Y_lf, Y_hf])
         X_train = np.vstack([X_lf, X_hf])
-        
-        # Fidelity column: 0 = LF, 1 = HF
         fidelities = np.vstack([
             np.zeros((X_lf.shape[0], 1)),
             np.ones((X_hf.shape[0], 1))
         ])
         X_train_with_fid = np.hstack([X_train, fidelities])
-        
-        # =====================================================
-        # Step 4: Create and train MF-GP
-        # =====================================================
-        # Create kernels for each fidelity
+
+        # Step 3: Create and train MF-GP
         kernels = [GPy.kern.RBF(input_dim=input_dim, ARD=True) for _ in range(2)]
         lin_mf_kernel = LinearMultiFidelityKernel(kernels)
-        
-        # Create MF model
+
         self.gpy_model = GPyLinearMultiFidelityModel(
             X_train_with_fid, Y_train, lin_mf_kernel, n_fidelities=2
         )
-        
-        # Constrain noise
+
         try:
             self.gpy_model.mixed_noise.Gaussian_noise.constrain_positive()
             self.gpy_model.mixed_noise.Gaussian_noise_1.constrain_positive()
         except Exception:
             pass
-        
-        # Wrap and optimize
+
         self.model = GPyMultiOutputWrapper(
             self.gpy_model, 2, n_optimization_restarts=self.num_restarts
         )
         self.model.optimize()
-        
+
         self.is_trained = True
-        
-        # Extract learned rho if available
+
+        # Diagnostic: report kernel-learned rho
         learned_rho = None
         try:
-            learned_rho = self.gpy_model.kern.rho.values[0]
+            learned_rho = float(self.gpy_model.kern.rho.values[0])
         except Exception:
             pass
-        
-        return {
-            'scaling_rho': self.rho,
-            'scaling_bias': self.bias,
-            'learned_rho': learned_rho,
-        }
+
+        return {'learned_rho': learned_rho}
+
     
     def predict(self, X: np.ndarray, return_std: bool = True
                ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
