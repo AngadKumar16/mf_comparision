@@ -753,7 +753,7 @@ def run_all_scenarios(run_noise: bool = True, save: bool = True):
         noise_results = run_noise_ablation(
             real_data, real_fac,
             noise_levels=NOISE_LEVELS,
-            n_trials=N_NOISE_TRIALS,
+            n_trials=1,
         )
         print(f"  [3/3] Noise ablation total: {time.time()-t3:.1f}s ({(time.time()-t3)/60:.1f} min)")
     else:
