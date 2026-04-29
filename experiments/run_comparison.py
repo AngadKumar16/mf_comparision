@@ -18,6 +18,11 @@ import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 import numpy as np
 import warnings
+from sklearn.model_selection import LeaveOneOut
+from utils.metrics import (compute_regression_metrics,
+                                compute_uncertainty_metrics,
+                                print_metrics_summary)
+from uncertainty.ensemble import DeepEnsemble
 import time
 
 warnings.filterwarnings('ignore')
@@ -123,59 +128,72 @@ def create_model_factories():
     return factories
 
 
-def run_loo_comparison(data: dict, model_factories: dict,
-                       verbose: bool = True, ensemble_nn: bool = True):
-    """Train on 12 HF points, evaluate on 2 held-out test points.
-    Matches AGU 2025 evaluation protocol (Kumar & Shukla, 2025).
+def run_loo_cv(data: dict, model_factories: dict,
+               verbose: bool = True, ensemble_nn: bool = True):
+    """True leave-one-out CV across HF training points.
+
+    For each of the n_hf training points, hold one out, train on the
+    remaining n_hf-1 points (plus all LF data), and predict the held-out
+    point. Aggregate predictions across folds and compute metrics.
 
     Args:
-        ensemble_nn: Wrap DNN/KAN/Hybrid with DeepEnsemble(n=5) so they
-                     produce meaningful NLL/Coverage alongside GP-Linear.
+        data: Dict with X_lf, Y_lf, X_hf_train, Y_hf_train.
+        model_factories: {name: factory_function}
+        ensemble_nn: Wrap DNN/KAN/Hybrid with DeepEnsemble(n=5) for
+                     meaningful uncertainty alongside GP-Linear.
     """
-    from utils.metrics import (compute_regression_metrics,
-                                compute_uncertainty_metrics,
-                                print_metrics_summary)
-    from uncertainty.ensemble import DeepEnsemble
+
+    X_hf = np.asarray(data['X_hf_train'])
+    Y_hf = np.asarray(data['Y_hf_train']).reshape(-1, 1)
+    n = len(X_hf)
 
     results = {}
 
     for name, factory in model_factories.items():
         if verbose:
             print(f"\n{'='*50}")
-            print(f"Running 12/2 holdout for {name}")
+            print(f"Running LOO-CV for {name} ({n} folds)")
             print('='*50)
 
         effective_factory = factory
         if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
             effective_factory = lambda f=factory: DeepEnsemble(f, n_models=5)
 
+        yt, yp, ys = [], [], []
         t_start = time.time()
         try:
-            model = NormalizingModelWrapper(effective_factory())
-            model.fit(data['X_lf'], data['Y_lf'],
-                      data['X_hf_train'], data['Y_hf_train'])
+            for fold_idx, (tr, va) in enumerate(LeaveOneOut().split(X_hf)):
+                if verbose:
+                    print(f"  Fold {fold_idx+1}/{n}...", end='\r')
 
-            y_pred, y_std = model.predict(data['X_hf_test'], return_std=True)
-            if y_std is None:
-                y_std = np.zeros_like(y_pred)
+                model = NormalizingModelWrapper(effective_factory())
+                model.fit(data['X_lf'], data['Y_lf'], X_hf[tr], Y_hf[tr])
 
-            y_true = np.asarray(data['Y_hf_test']).flatten()
-            y_pred_flat = y_pred.flatten()
-            y_std_flat = y_std.flatten()
+                p, s = model.predict(X_hf[va], return_std=True)
+                if s is None:
+                    s = np.zeros_like(p)
 
-            reg = compute_regression_metrics(y_true, y_pred_flat)
-            unc = compute_uncertainty_metrics(y_true, y_pred_flat, y_std_flat)
+                yt.append(float(Y_hf[va].flatten()[0]))
+                yp.append(float(p.flatten()[0]))
+                ys.append(float(s.flatten()[0]))
+
+            yt = np.array(yt)
+            yp = np.array(yp)
+            ys = np.array(ys)
+
+            reg = compute_regression_metrics(yt, yp)
+            unc = compute_uncertainty_metrics(yt, yp, ys)
             metrics = {
-                'y_true': y_true, 'y_pred': y_pred_flat, 'y_std': y_std_flat,
-                'n_folds': len(y_true),
+                'y_true': yt, 'y_pred': yp, 'y_std': ys,
+                'n_folds': n,
                 **reg, **unc,
             }
 
             elapsed = time.time() - t_start
-            print(f"  Time: {elapsed:.1f}s ({elapsed/60:.1f} min)")
+            print(f"  Completed {n} folds in {elapsed:.1f}s ({elapsed/60:.1f} min)")
         except Exception as e:
             elapsed = time.time() - t_start
-            print(f"\n  !! {name} holdout failed after {elapsed:.1f}s ({elapsed/60:.1f} min): {e}")
+            print(f"\n  !! {name} LOO-CV failed after {elapsed:.1f}s: {e}")
             import traceback
             traceback.print_exc()
             results[name] = None

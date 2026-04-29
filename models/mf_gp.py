@@ -118,10 +118,7 @@ class MFGP_Linear:
         self.gpy_model = None
         self.lf_gp = None  # Separate LF GP for predictions
         self.is_trained = False
-        
-        # Store scaling parameters
-        self.bias = None
-    
+            
     def fit(self, X_lf, Y_lf, X_hf, Y_hf, **kwargs):
         """Train linear MF-GP."""
         X_lf = np.asarray(X_lf, dtype=np.float64)
