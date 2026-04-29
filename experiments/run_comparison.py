@@ -210,54 +210,100 @@ def run_loo_comparison(data: dict, model_factories: dict,
 
 
 def run_noise_ablation(data: dict, model_factories: dict, 
-                       noise_levels: list = None, n_trials: int = 3):
-    """Run noise ablation study."""
+                       noise_levels: list = None, n_trials: int = 1):
+    """Run noise ablation study using LOO across all 14 HF points.
+    
+    For each (noise_level, model, trial):
+        Run a full LOO pass over the 14 HF points. At each fold:
+          - Add noise (with seed) to the 13 training points' Y_hf
+          - Train model on (X_lf, Y_lf, X_hf_train_fold, Y_noisy_train_fold)
+          - Predict on the held-out point
+        Aggregate the 14 fold predictions and compute RMSE.
+    
+    Matches the protocol of the main LOO table, so 0%-noise column equals
+    the main LOO numbers exactly.
+    
+    n_trials=1 (~6.5 hr): fold-residual std reported.
+    n_trials=3 (~20 hr): cross-trial mean ± std reported.
+    """
     from data.loader import add_noise
     from utils.metrics import compute_regression_metrics
-    
+
     if noise_levels is None:
         noise_levels = NOISE_LEVELS
-    
+
+    # Pool all 14 HF points to match main LOO protocol
+    X_hf = np.vstack([
+        np.asarray(data['X_hf_train']),
+        np.asarray(data['X_hf_test']),
+    ])
+    Y_hf = np.vstack([
+        np.asarray(data['Y_hf_train']).reshape(-1, 1),
+        np.asarray(data['Y_hf_test']).reshape(-1, 1),
+    ])
+    n_folds = len(X_hf)
+
+    print(f"  LOO noise ablation: {n_folds} folds, {n_trials} trial(s)")
+
     results = {name: {} for name in model_factories.keys()}
-    
+
     for noise_level in noise_levels:
         print(f"\n{'='*50}")
         print(f"Noise Level: {noise_level*100:.0f}%")
         print('='*50)
-        
+
         for name, factory in model_factories.items():
-            trial_metrics = []
+            trial_rmses = []
+            trial_maes = []
             t_model_start = time.time()
 
             for trial in range(n_trials):
-                # Add noise
-                Y_hf_noisy, _ = add_noise(
-                    data['Y_hf_train'], 
-                    noise_level, 
-                    seed=RANDOM_SEED + trial * 1000
-                )
-                
-                # Train model (wrapper handles normalization)
-                model = NormalizingModelWrapper(factory())
-                model.fit(data['X_lf'], data['Y_lf'],
-                         data['X_hf_train'], Y_hf_noisy)
+                yt_fold, yp_fold = [], []
 
-                # Evaluate on clean test data
-                y_pred, _ = model.predict(data['X_hf_test'], return_std=False)
-                metrics = compute_regression_metrics(data['Y_hf_test'], y_pred)
-                trial_metrics.append(metrics)
-            
-            # Average across trials
-            avg_metrics = {}
-            for key in trial_metrics[0].keys():
-                values = [m[key] for m in trial_metrics]
-                avg_metrics[f'{key}_mean'] = np.mean(values)
-                avg_metrics[f'{key}_std'] = np.std(values)
-            
+                for fold_idx, (tr, va) in enumerate(LeaveOneOut().split(X_hf)):
+                    X_tr, Y_tr = X_hf[tr], Y_hf[tr]
+                    X_va, Y_va = X_hf[va], Y_hf[va]
+
+                    fold_seed = RANDOM_SEED + trial * 1000 + fold_idx * 7
+                    Y_tr_noisy, _ = add_noise(Y_tr, noise_level, seed=fold_seed)
+
+                    model = NormalizingModelWrapper(factory())
+                    model.fit(data['X_lf'], data['Y_lf'], X_tr, Y_tr_noisy)
+                    y_pred, _ = model.predict(X_va, return_std=False)
+
+                    yt_fold.append(float(Y_va.flatten()[0]))
+                    yp_fold.append(float(y_pred.flatten()[0]))
+
+                yt_fold = np.array(yt_fold)
+                yp_fold = np.array(yp_fold)
+                m = compute_regression_metrics(yt_fold, yp_fold)
+                trial_rmses.append(m['rmse'])
+                trial_maes.append(m['mae'])
+
             elapsed = time.time() - t_model_start
+
+            if n_trials == 1:
+                # Use fold-residual std as variance proxy
+                residuals = yt_fold - yp_fold
+                std_proxy = float(np.std(np.abs(residuals)))
+                avg_metrics = {
+                    'rmse_mean': float(np.mean(trial_rmses)),
+                    'rmse_std':  std_proxy,
+                    'mae_mean':  float(np.mean(trial_maes)),
+                    'mae_std':   std_proxy,
+                }
+            else:
+                avg_metrics = {
+                    'rmse_mean': float(np.mean(trial_rmses)),
+                    'rmse_std':  float(np.std(trial_rmses)),
+                    'mae_mean':  float(np.mean(trial_maes)),
+                    'mae_std':   float(np.std(trial_maes)),
+                }
+
             results[name][noise_level] = avg_metrics
-            print(f"  {name}: RMSE = {avg_metrics['rmse_mean']:.4f} ± {avg_metrics['rmse_std']:.4f}  [{elapsed:.1f}s]")
-    
+            print(f"  {name}: RMSE = {avg_metrics['rmse_mean']:.4f} ± "
+                  f"{avg_metrics['rmse_std']:.4f}  [{elapsed:.1f}s]")
+
     return results
 
 
