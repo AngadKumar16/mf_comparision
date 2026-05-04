@@ -1,21 +1,21 @@
 % Requires \usepackage{booktabs,multirow}
 \begin{table}[ht]
-\caption{LOO-CV metrics across all comparison scenarios ($n=12$ folds per dataset).}
+\caption{LOO-CV metrics across all comparison scenarios ($n=14$ folds per dataset).}
 \label{tab:scenario_comparison}
 \begin{tabular}{llrrrrr}
 \toprule
  &  & RMSE & MAE & R² & NLL & Cov.\ 90\% \\
 Scenario & Model &  &  &  &  &  \\
 \midrule
-\multirow[t]{4}{*}{Forrester} & GP-Linear & 0.0033 & 0.0020 & 1.0000 & -4.5319 & 100.00% \\
- & DNN & 0.5745 & 0.4958 & 0.9849 & 6.3798 & 16.67% \\
- & KAN & 1.2652 & 0.7954 & 0.9270 & 4.1857 & 58.33% \\
- & Hybrid & 0.6953 & 0.5615 & 0.9779 & 16.2790 & 8.33% \\
+\multirow[t]{4}{*}{Forrester} & GP-Linear & 0.0282 & 0.0090 & 1.0000 & -4.3120 & 100.00% \\
+ & DNN & 0.7611 & 0.6488 & 0.9837 & 7.3864 & 14.29% \\
+ & KAN & 2.5945 & 1.3780 & 0.8109 & 11.7621 & 50.00% \\
+ & Hybrid & 0.7326 & 0.6031 & 0.9849 & 16.2223 & 7.14% \\
 \cline{1-7}
-\multirow[t]{4}{*}{Real (clean)} & GP-Linear & 0.6046 & 0.4884 & 0.0776 & 1.4227 & 83.33% \\
- & DNN & 0.7221 & 0.5702 & -0.3160 & 25.7088 & 41.67% \\
- & KAN & 0.8158 & 0.6215 & -0.6794 & 1.7151 & 66.67% \\
- & Hybrid & 0.8248 & 0.6366 & -0.7168 & 16.5718 & 25.00% \\
+\multirow[t]{4}{*}{Real (clean)} & GP-Linear & 0.5778 & 0.4750 & 0.1298 & 1.4329 & 78.57% \\
+ & DNN & 0.7164 & 0.5443 & -0.3379 & 66.7585 & 35.71% \\
+ & KAN & 0.5378 & 0.4642 & 0.2459 & 1.8085 & 57.14% \\
+ & Hybrid & 0.7487 & 0.5777 & -0.4612 & 13.9290 & 28.57% \\
 \cline{1-7}
 \bottomrule
 \end{tabular}
