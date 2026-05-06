@@ -167,6 +167,9 @@ def run_loo_comparison(data: dict, model_factories: dict,
                 if verbose:
                     print(f"  Fold {fold_idx+1}/{n}...", end='\r')
 
+                fold_seed = RANDOM_SEED + fold_idx * 7
+                np.random.seed(fold_seed)
+                tf.random.set_seed(fold_seed)
                 model = NormalizingModelWrapper(effective_factory())
                 model.fit(data['X_lf'], data['Y_lf'], X_hf[tr], Y_hf[tr])
 
@@ -210,7 +213,8 @@ def run_loo_comparison(data: dict, model_factories: dict,
 
 
 def run_noise_ablation(data: dict, model_factories: dict, 
-                       noise_levels: list = None, n_trials: int = 1):
+                       noise_levels: list = None, n_trials: int = 1,
+                       ensemble_nn: bool = True):
     """Run noise ablation study using LOO across all 14 HF points.
     
     For each (noise_level, model, trial):
@@ -253,6 +257,10 @@ def run_noise_ablation(data: dict, model_factories: dict,
         print('='*50)
 
         for name, factory in model_factories.items():
+            effective_factory = factory
+            if ensemble_nn and name in ('DNN', 'KAN', 'Hybrid'):
+
+                effective_factory = lambda f=factory: DeepEnsemble(f, n_models=5)
             trial_rmses = []
             trial_maes = []
             t_model_start = time.time()
@@ -267,7 +275,7 @@ def run_noise_ablation(data: dict, model_factories: dict,
                     fold_seed = RANDOM_SEED + trial * 1000 + fold_idx * 7
                     Y_tr_noisy, _ = add_noise(Y_tr, noise_level, seed=fold_seed)
 
-                    model = NormalizingModelWrapper(factory())
+                    model = NormalizingModelWrapper(effective_factory())
                     model.fit(data['X_lf'], data['Y_lf'], X_tr, Y_tr_noisy)
                     y_pred, _ = model.predict(X_va, return_std=False)
 
