@@ -88,13 +88,13 @@ class MFTrainer(tf.Module):
     - Final HF: Y_hf = Y_hf_nl + Y_hf_l
     """
 
-    def __init__(self, layers_lf: List[int], layers_hf_nl: List[int],
+    def __init__(self, layers_lf: List[int], layers_hf_nl: List[int], 
                  layers_hf_l: List[int], learning_rate: float = 0.001,
                  l2_reg: float = 0.01):
         super().__init__()
 
         self.dnn = DNN()
-        self.l2_reg = l2_reg
+        self.l2_reg = l2_reg   # used in train_step's L2 penalty
 
         # Initialize networks
         self.W_lf, self.b_lf = self.dnn.hyper_initial(layers_lf)

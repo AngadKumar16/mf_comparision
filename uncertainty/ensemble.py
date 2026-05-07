@@ -24,14 +24,19 @@ class DeepEnsemble:
         mean, epistemic, aleatoric = ensemble.predict_with_decomposition(X_test)
     """
     
-    def __init__(self, model_factory: Callable, n_models: int = 5):
+    def __init__(self, model_factory: Callable, n_models: int = 5,
+                 bootstrap_hf: bool = True):
         """
         Args:
             model_factory: Function that returns a new model instance
             n_models: Number of ensemble members (5-10 typical)
+            bootstrap_hf: If True, each member resamples HF data with
+                replacement to break ensemble collapse at small n_HF.
+                LF data is shared across members.
         """
         self.model_factory = model_factory
         self.n_models = n_models
+        self.bootstrap_hf = bootstrap_hf
         self.models: List = []
         self.is_trained = False
         self.name = f"Ensemble({n_models})"
@@ -49,15 +54,31 @@ class DeepEnsemble:
         self.models = []
         training_infos = []
         
+        X_hf = np.asarray(X_hf)
+        Y_hf = np.asarray(Y_hf).reshape(-1, 1)
+        n_hf = len(X_hf)
+        
         for i in range(self.n_models):
             if verbose:
                 print(f"\n--- Training ensemble member {i+1}/{self.n_models} ---")
             
-            # Set different seeds
+            # Set different seeds per member
             seed = 42 + i * 1000
             np.random.seed(seed)
             tf.random.set_seed(seed)
             tf.keras.utils.set_random_seed(seed)
+            
+            # Bootstrap HF data per member to break ensemble collapse
+            if self.bootstrap_hf:
+                idx = np.random.choice(n_hf, size=n_hf, replace=True)
+                X_hf_member = X_hf[idx]
+                Y_hf_member = Y_hf[idx]
+                if verbose:
+                    n_unique = len(np.unique(idx))
+                    print(f"  Bootstrap: {n_unique}/{n_hf} unique HF points")
+            else:
+                X_hf_member = X_hf
+                Y_hf_member = Y_hf
             
             # Create and train model
             model = self.model_factory()
@@ -66,7 +87,7 @@ class DeepEnsemble:
             if hasattr(model, 'verbose'):
                 model.verbose = False
             
-            info = model.fit(X_lf, Y_lf, X_hf, Y_hf, **kwargs)
+            info = model.fit(X_lf, Y_lf, X_hf_member, Y_hf_member, **kwargs)
             
             self.models.append(model)
             training_infos.append(info)

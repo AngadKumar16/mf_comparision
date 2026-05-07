@@ -108,6 +108,7 @@ def create_model_factories():
             learning_rate=KAN_CONFIG['learning_rate'],
             max_epochs=KAN_CONFIG['max_epochs'],
             patience=KAN_CONFIG['patience'],
+            l2_reg_base=KAN_CONFIG.get('l2_reg_base', 0.05),
             lf_pretrain_patience=KAN_CONFIG.get('lf_pretrain_patience', 500),
             verbose=False
         ),

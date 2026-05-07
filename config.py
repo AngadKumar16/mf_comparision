@@ -41,28 +41,29 @@ GP_CONFIG = {
 # ============================================================
 MAX_EPOCHS = 10000          # Safety ceiling; early stopping does the real work
 LF_PRETRAIN_PATIENCE = 500  # Phase 1: stop LF pretraining after no improvement
-JOINT_PATIENCE = 2000       # Phase 2: stop joint training after no improvement
+JOINT_PATIENCE = 500       # Phase 2: stop joint training after no improvement
 
 # Deep Neural Network
 DNN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 6, 6, 1],
+    'layers_hf_nl': [3, 4, 1],
     'layers_hf_l': [3, 1],
     'learning_rate': 0.001,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
-    'l2_reg': 0.03,
+    'l2_reg': 0.1,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
 }
 
 # Kolmogorov-Arnold Network
 KAN_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 6, 6, 1],
+    'layers_hf_nl': [3, 4, 1],
     'layers_hf_l': [3, 1],
     'grid_size': 3,
     'spline_order': 3,
     'learning_rate': 0.001,
+    'l2_reg_base': 0.1,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,
@@ -71,12 +72,12 @@ KAN_CONFIG = {
 # Hybrid KAN+DNN (NOVELTY)
 HYBRID_CONFIG = {
     'layers_lf': [2, 20, 20, 1],
-    'layers_hf_nl': [3, 6, 6, 1],
+    'layers_hf_nl': [3, 4, 1],
     'layers_hf_l': [3, 1],
     'grid_size': 3,
     'spline_order': 3,
     'learning_rate': 0.001,
-    'l2_reg': 0.03,
+    'l2_reg': 0.1,
     'max_epochs': MAX_EPOCHS,
     'patience': JOINT_PATIENCE,
     'lf_pretrain_patience': LF_PRETRAIN_PATIENCE,

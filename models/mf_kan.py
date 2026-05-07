@@ -228,8 +228,10 @@ class MFKANTrainer(tf.Module):
     
     def __init__(self, layers_lf: List[int], layers_hf_nl: List[int], 
                  layers_hf_l: List[int], grid_size: int = 5, 
-                 spline_order: int = 3, learning_rate: float = 0.001):
+                 spline_order: int = 3, learning_rate: float = 0.001,
+                 l2_reg_base: float = 0.05):
         super().__init__()
+        self.l2_reg_base = l2_reg_base
         
         # LF KAN
         self.kan_lf = KAN(layers_lf, grid_size, spline_order, name='kan_lf')
@@ -294,8 +296,12 @@ class MFKANTrainer(tf.Module):
             # Losses — drop loss_lf and reg_lf since LF is frozen
             loss_hf = tf.reduce_mean(tf.square(y_pred_hf - y_hf))
             loss_lf = tf.reduce_mean(tf.square(y_pred_lf - y_lf))  # monitor only
-            reg_hf  = self.kan_hf_nl.regularization_loss(0.05)
-            loss    = loss_hf + reg_hf
+            reg_hf_l1 = self.kan_hf_nl.regularization_loss(0.05)
+            # L2 on residual path's base_weight (was unconstrained)
+            reg_hf_l2 = self.l2_reg_base * tf.add_n(
+                [tf.nn.l2_loss(layer.base_weight) for layer in self.kan_hf_nl.layers]
+            )
+            loss    = loss_hf + reg_hf_l1 + reg_hf_l2
 
         hf_vars = self.kan_hf_nl.trainable_variables + [self.W_hf_l, self.b_hf_l]
         grads = tape.gradient(loss, hf_vars)
@@ -352,6 +358,7 @@ class MFKAN:
                  learning_rate: float = 0.001,
                  max_epochs: int = 30000,
                  patience: int = 1000,
+                 l2_reg_base: float = 0.05,
                  lf_pretrain_patience: int = 500,
                  sf: bool = False,
                  verbose: bool = True):
@@ -366,9 +373,11 @@ class MFKAN:
         self.learning_rate = learning_rate
         self.max_epochs = max_epochs
         self.patience = patience
+        self.l2_reg_base = l2_reg_base
         self.lf_pretrain_patience = lf_pretrain_patience
         self.sf = sf
         self.verbose = verbose
+
 
         self.trainer = None
         self.is_trained = False
@@ -389,7 +398,8 @@ class MFKAN:
         self.trainer = MFKANTrainer(
             self.layers_lf, self.layers_hf_nl, self.layers_hf_l,
             grid_size=self.grid_size, spline_order=self.spline_order,
-            learning_rate=self.learning_rate
+            learning_rate=self.learning_rate,
+            l2_reg_base=self.l2_reg_base,
         )
         self.trainer.sf = self.sf
         
