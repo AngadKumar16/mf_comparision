@@ -686,31 +686,3 @@ def plot_scenario_comparison(
 
     plt.show()
     return fig
-
-
-# ============================================================
-# TESTING
-# ============================================================
-if __name__ == "__main__":
-    print("Testing visualization module...")
-    
-    # Create synthetic data
-    np.random.seed(42)
-    y_true = np.array([20, 21, 22, 23, 24])
-    y_pred = np.array([20.5, 21.2, 21.8, 23.1, 23.8])
-    y_std = np.array([0.3, 0.4, 0.3, 0.2, 0.4])
-    
-    # Test LOO scatter
-    print("\nTesting LOO scatter plot...")
-    plot_loo_scatter(y_true, y_pred, y_std, model_name="Test Model")
-    
-    # Test comparison bars
-    print("\nTesting comparison bar chart...")
-    results = {
-        'Model A': {'rmse': 0.5, 'mae': 0.4, 'r2': 0.9},
-        'Model B': {'rmse': 0.6, 'mae': 0.5, 'r2': 0.85},
-        'Model C': {'rmse': 0.4, 'mae': 0.3, 'r2': 0.95},
-    }
-    plot_model_comparison_bars(results)
-    
-    print("\n✓ Visualization tests passed!")
