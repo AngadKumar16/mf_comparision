@@ -459,7 +459,7 @@ def train_all_models(data: dict, model_factories: dict) -> tuple:
     # The single-model versions remain for LOO-CV (speed); ensembles are only
     # used during PyGMT / uncertainty visualisation.
     print("\n  Building Deep Ensembles (n=5) for DNN & KAN uncertainty maps...")
-    for name in ('DNN', 'KAN'):
+    for name in ('DNN', 'KAN', 'Hybrid'):
         if name not in model_factories:
             continue
         factory = model_factories[name]
