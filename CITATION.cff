@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "A Hybrid Kolmogorov-Arnold and Deep Neural Network Architecture for Low Cost Multi-Fidelity Modeling with Sea Surface Temperature Application in the Boston Harbor"
+version: 1.0.0
+date-released: 2026-05-18
+license: MIT
+repository-code: https://github.com/AngadKumar16/mf_comparision
+authors:
+  - family-names: Kumar
+    given-names: Angad
+    affiliation: "Obra D. Tompkins High School, Katy, TX, USA"
+    orcid: https://orcid.org/0009-0003-5253-3335
+  - family-names: Shukla
+    given-names: Khemraj
+    affiliation: "Division of Applied Mathematics, Brown University, Providence, RI, USA"
+keywords:
+  - multi-fidelity surrogate modeling
+  - Kolmogorov-Arnold Networks
+  - Gaussian process regression
+  - deep neural networks
+  - sea surface temperature
+  - uncertainty quantification
+abstract: "Multi-fidelity modeling combines abundant but often inaccurate and biased low-fidelity (LF) data with sparse but accurate high-fidelity (HF) observations to construct predictive models when neither source alone suffices. This research introduces a hybrid multi-fidelity architecture that combines a Kolmogorov-Arnold Network (KAN) for the low-fidelity surrogate with a feedforward deep neural network (DNN) for the high-fidelity correction, motivated by the inductive-bias asymmetry between the smooth LF field and the small, localized HF residual. The hybrid model is compared against three baselines with identical training and evaluation protocols: a Kennedy-O'Hagan linear Gaussian process (GP), a deep multi-fidelity neural network based on Meng and Karniadakis~\cite{meng2020}, and a multi-fidelity KAN. All four models are evaluated under leave-one-out (LOO) cross-validation on a Boston Harbor sea surface temperature dataset comprising $n_L = 653$ Landsat-derived satellite retrievals and $n_H = 14$ in-situ buoy observations, with metrics covering point-estimate accuracy (RMSE, MAE), predictive likelihood (NLL), and calibration (Expected Calibration Error, empirical coverage at 90\%). The linear Gaussian process achieves the lowest RMSE and is the only model with positive $R^2$ on the real data, consistent with the small-data regime favoring methods with strong analytic priors. The proposed hybrid model achieves the lowest MAE (0.433\,$^\circ$C), best NLL (1.428), best calibration (ECE $= 0.084$), and is the most noise-robust of the three neural architectures as there is only a $+0.032$ RMSE growth across 0-20\% additive HF noise versus $+0.080$ for the DNN. A noise ablation supports these claims at the $n_H = 14$ sample size. We also report a negative result as the multi-fidelity KAN underperforms both the feedforward neurals and the Gaussian process despite explicit regularization on spline coefficients and residual-path weights. This indicates that B-spline activations alone are not well-matched to multi-fidelity correction tasks for a small sample size."
